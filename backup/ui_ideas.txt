@@ -1,0 +1,1 @@
+1. all frame classes must have init (called when it comes in front by animation) and clear (called when it got removed by animation)
