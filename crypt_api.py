@@ -7,7 +7,6 @@ from stat import S_IWUSR, S_IREAD, S_IRGRP, S_IROTH
 
 # Constants used as default in instances
 EncExt = ".rce"
-ExpertDecKey = 'A3f$45fh78gs5fd34gsf#@haasd3224@45#6^*s7%hag32423hdsF*sh)ahdY6532'
 
 # Encryption Constants
 MinLimit = 12                   # min prime limit
@@ -135,24 +134,63 @@ def get_filesize(fd):
     return _file_size
 
 
-def get_alt_path(path, count=1):
-    """
-    :param path: path to be checked
-    :param count: current alternate path count
-    :return: alternate path which does not exists yet
-    """
-    if os.path.exists(path):
-        if os.path.isfile(path):
-            __p, __ext = os.path.splitext(path)
-        else:
-            __p, __ext = path, ''
-        __r_p = "".join(reversed(__p))
-        if count > 1 or ('(' in __r_p and __r_p.index('(') < 5):
-            __r_p = __r_p[__r_p.index('(') + 1:]
-            __p = "".join(reversed(__r_p))
-        return get_alt_path(f'{__p}({count}){__ext}', count + 1)
+# def get_alt_path(path, count=1):
+#     """
+#     :param path: path to be checked
+#     :param count: current alternate path count
+#     :return: alternate path which does not exists yet
+#     """
+#     if os.path.exists(path):
+#         if os.path.isfile(path):
+#             __p, __ext = os.path.splitext(path)
+#         else:
+#             __p, __ext = path, ''
+#         __r_p = "".join(reversed(__p))
+#         if count > 1 or ('(' in __r_p and __r_p.index('(') < 5):
+#             __r_p = __r_p[__r_p.index('(') + 1:]
+#             __p = "".join(reversed(__r_p))
+#         return get_alt_path(f'{__p}({count}){__ext}', count + 1)
+#
+#     return path
 
-    return path
+
+def get_non_existing_path(path: str, return_suffix: bool = False):
+    """
+    generate's a non-existing path by Suffixing a number to an existing file/dir path
+
+    :param path: path to be checked
+    :param return_suffix: whether to return number suffixed as well
+    :return: (number_suffixed, new_path) if return_suffix is True else new_path
+    """
+    if not os.path.exists(path):
+        return path
+
+    base, ext = os.path.splitext(path)
+    num, index, last = 1, 0, len(base) - 1
+
+    if base[last] == ')':
+        index = base.rfind('(')
+        if index != -1:
+            try:
+                num = int(base[index + 1: last])
+                if base[index - 1] == ' ':
+                    index -= 1
+                    base = base[:index]
+            except (TypeError, ValueError):
+                pass
+
+    while True:
+        temp = f'{base} ({num}){ext}'
+        if os.path.exists(temp):
+            num += 1
+        else:
+            break
+
+    return (num, temp) if return_suffix else temp
+
+
+def create_batch_file_name(primary_dir, names) -> str:
+    return f'{names[0]} (encrypted)'
 
 
 def get_new_pos(pos, chunk_size, start=0):
@@ -194,6 +232,14 @@ def is_writable(path):
         return True
 
 
+def generate_random_p_q(min_limit, max_limit):
+    primes = [i for i in range(min_limit, max_limit) if is_prime(i)]      # prime numbers in range
+    prime1, prime2 = secrets.choice(primes), secrets.choice(primes)
+    while prime1 == prime2:
+        prime2 = secrets.choice(primes)
+    return prime1, prime2
+
+
 # ............................... Classes .....................
 class Encryptor:
     def __init__(self, prime1=None, prime2=None, min_limit=12, max_limit=40, text_base=':'):
@@ -202,11 +248,8 @@ class Encryptor:
         self.min_limit = min_limit
         self.max_limit = max_limit
 
-        if prime1 is None or prime2 is None:
-            primes = [i for i in range(self.min_limit, self.max_limit) if is_prime(i)]  # prime numbers in range
-            prime1, prime2 = secrets.choice(primes), secrets.choice(primes)
-            while prime1 == prime2:
-                prime2 = secrets.choice(primes)
+        if not prime1 or min_limit > prime1 > max_limit or not prime2 or min_limit > prime2 > max_limit:
+            prime1, prime2 = generate_random_p_q(min_limit, max_limit)
 
         self.p = prime1
         self.q = prime2
@@ -283,11 +326,11 @@ class Decryptor:
     def get_enc_keys(self):
         return [i for i in range(2, self.pn) if co_prime(i, self.n) and co_prime(i, self.pn)]
 
-    def get_dec_keys(self, enc_key, num=1):
-        return [i for i in range(1, num * self.pn) if (enc_key * i) % self.pn == 1]
-
     def get_dec_gen(self, enc_key, limit=10 ** 5):
         return (i for i in range(1, limit) if (enc_key * i) % self.pn == 1)
+
+    def get_dec_keys(self, enc_key, num=1):
+        return list(self.get_dec_gen(enc_key, num * self.pn))
 
     def decrypt_int(self, val, dec_key):
         return (val ** dec_key) % self.n
@@ -310,11 +353,11 @@ class Decryptor:
 
 class EncBatch(Encryptor):
     """ for encrypting batch of files """
-    def __init__(self, text_encoding=TextEncoding, chunk_size=ChunkSize, meta_base=MetaBase, meta_encoding=MetaEncoding,
+    def __init__(self, min_minit=MinLimit, max_limit=MaxLimit, text_encoding=TextEncoding, chunk_size=ChunkSize, meta_base=MetaBase, meta_encoding=MetaEncoding,
                  pointer_base=PointerBase, pointer_size=PointerSize, name_base=NameBase, data_code_base=DataTypeBase,
                  file_data_base=FileDataBase, dec_code_base=DecCodeBase, pointer_dec_separator=PointerDecSeparator):
 
-        Encryptor.__init__(self, min_limit=MinLimit, max_limit=MaxLimit, text_base=TextBase)
+        Encryptor.__init__(self, min_limit=min_minit, max_limit=max_limit, text_base=TextBase)
 
         self.chunk_size = chunk_size         # specific
         self.text_encoding = text_encoding
@@ -388,10 +431,11 @@ class EncBatch(Encryptor):
         # 3. configuring path of output batch file
         if not b_f_path:  # out batch enc file
             __dir = os.path.dirname(os.path.realpath(fd_seq[0].name))
-            __name = "_".join(os.path.splitext(i)[0][:10] for i in self.names[:5])
+            # __name = "_".join(os.path.splitext(i)[0][:10] for i in self.names[:5])
+            __name = create_batch_file_name(__dir, self.names)
             b_f_path = os.path.join(__dir, f'{__name}{enc_ext}')
 
-        self.b_f_path = get_alt_path(b_f_path)
+        self.b_f_path = get_non_existing_path(b_f_path)
         on_prog_call('path', self.b_f_path, 0)
         __no = len(fd_seq)  # no of files
 
@@ -555,13 +599,13 @@ class DecBatch(Decryptor):
         else:
             out_dir = os.path.join(out_dir, _name[:10] + '..(Decrypted)')
 
-        self.out_dir = get_alt_path(out_dir)
+        self.out_dir = get_non_existing_path(out_dir)
         if not os.path.isdir(self.out_dir):
             os.makedirs(self.out_dir)
 
         # main_cli data decryption
         for _name, _d_code, _pointer, _n_pointer in zip(self.names, self.data_codes, self.pointers, self._next_pointers):
-            _f_path = get_alt_path(os.path.join(self.out_dir, _name))
+            _f_path = get_non_existing_path(os.path.join(self.out_dir, _name))
             _r_size = _n_pointer - _pointer
 
             with open(_f_path, 'wb+') as o__f:

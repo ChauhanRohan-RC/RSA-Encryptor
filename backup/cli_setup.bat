@@ -1,1 +1,0 @@
-pyinstaller.exe --onefile --icon="D:\rc\PycharmProjects\Encryption\sdk\icons\encryption_exe.ico" Rcrypt.py

@@ -1,7 +1,6 @@
 import os
 import sys
 
-
 # ..............................................   Static Functions   .........................
 def rgb(*r_g_b):
     return '#%02x%02x%02x' % r_g_b
@@ -80,7 +79,6 @@ class C:
     Description = "An encryption enigma"
 
     Author = "Rohan Chauhan"
-    ExpertDecKey = 'A3f$45fh78gs5fd34gsf#@haasd3224@45#6^*s7%hag32423hdsF*sh)ahdY6532'
 
     # Current Working Dir
     main_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(
@@ -107,9 +105,9 @@ class C:
     DecFailed = 1
     DecLocked = 2
     DecChances = 3
-    AccessRegainTime = 10  # minutes to able to retry the decryption
+    AccessRegainTime = 0.1  # minutes to able to retry the decryption
     AccessRegainSecs = round(AccessRegainTime * 60)
-    MaxFailChances = 5  # after which it get locked and can only be decrypted by expert dec key
+    MaxFailChances = 3  # after which it get locked and can only be decrypted by expert dec key
 
     # Encodings
     MetaEncoding = 'utf-8'

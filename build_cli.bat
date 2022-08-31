@@ -1,0 +1,1 @@
+pyinstaller --onefile --icon="res\\icons\\encrypt_color_64.ico" CLI.py

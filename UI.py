@@ -6,13 +6,14 @@ from tkwidgets import FrameAnimator, HScrollScale, VScrollScale, HoverB, HProgre
 
 # Main Encryptor and Decryptor api
 from crypt_api import DecBatch, EncBatch, is_writable, is_path_textfile, \
-    get_alt_path, get_new_pos, yield_byte, read_only, clear_read_only
+    get_non_existing_path, get_new_pos, yield_byte, read_only, clear_read_only
 
 # Constants and resources
 from __c import *
 from threading import Thread
 import time
 import secrets
+import jkkguyv523asdasd
 
 # .............................      Constants     .........................
 bg = rgb(10, 10, 10)
@@ -527,7 +528,7 @@ class EncUi(Frame):
 
     def _encrypt_thread(self, path_seq, out_path, user_pass):
         self.enc.clear_cache()
-        out_path = get_alt_path(out_path)
+        out_path = get_non_existing_path(out_path)
         logger.log('\nEncryption : Configuring encrypted file, Resolving Output Path << %s >>\n' % out_path)
 
         # 1. encryption key
@@ -838,9 +839,14 @@ class DecUI(Frame):
 
             elif f_code == C.DecLocked:
                 if reset_time <= time.time():
-                    self.pass_check_frame.init(
-                        f'{format_path(file_path, 50)} is Locked due to Repetitive Fail Attempts\n\nEnter Expert Decryption Key to Unlock',
-                        C.ExpertDecKey, 1)
+                    if jkkguyv523asdasd.dfhds72346nh3434hsd34gsdf23h:
+                        self.pass_check_frame.init(
+                            f'{format_path(file_path, 50)} is Locked due to Repetitive Fail Attempts\n\nEnter Expert Decryption Key to Unlock',
+                            jkkguyv523asdasd.dfhds72346nh3434hsd34gsdf23h, 1)
+                    else:
+                        logger.error(f'Fatal Error: Failed to verify Expert Decryption Key from server!!')
+                        self.master.show_final_message(self, title=f"File Locked",
+                                                       alt=f"{format_path(file_path, 50)} is Locked\n\nFatal Error: Expert Decryption key could not be verified from server!!")
                 else:
                     __reset_del = format_secs(round(reset_time - time.time()), out='str')
                     logger.error(
@@ -902,7 +908,7 @@ class DecUI(Frame):
         if show_error:
             self.master.show_final_message(self,
                                            title=f"Access Unauthorized !",
-                                           alt=f"{format_path(self.file_path, 50)}has been Locked\n\nTry again after {__for_time}")
+                                           alt=f"{format_path(os.path.basename(self.file_path), 50)} has been Locked\n\nTry again after {__for_time}")
 
     def next_call(self):
         # 1. RESETTING DEC DATA
@@ -918,7 +924,7 @@ class DecUI(Frame):
         if not out_dir:
             _dir, _fname = os.path.split(self.file_path)
             __name = os.path.splitext(_fname)[0]
-            out_dir = get_alt_path(os.path.join(_dir, format_path(__name, 30) + '(Decrypted)'))
+            out_dir = get_non_existing_path(os.path.join(_dir, format_path(__name, 30) + '(Decrypted)'))
 
         # 3. To Decrypt
         self.progress_frame.init()
@@ -944,7 +950,7 @@ class DecUI(Frame):
                                                                 self.dec._next_pointers):
                     if self.pause:
                         break
-                    _f_path = get_alt_path(os.path.join(out_dir, _name))
+                    _f_path = get_non_existing_path(os.path.join(out_dir, _name))
                     _r_size = _n_pointer - _pointer
                     logger.log(
                         f'Decrypting File Name : {_name} || Data Type : {"Text" if _d_code == self.dec.text_code else "Bytes"}')
@@ -978,7 +984,7 @@ class DecUI(Frame):
                     logger.log('\nDecryption : File %s Decrypted Successful, OUTPUT Directory : %s \n' % (
                     self.file_path, out_dir))
                     self.master.show_final_message(self, title=f"Decryption Successful !",
-                                                   alt=f"Encrypted File : {format_path(self.file_path, 50)}\n\nOutput Dir : {out_dir}",
+                                                   alt=f"Encrypted File : {format_path(os.path.basename(self.file_path), 50)}\n\nOutput Dir : {out_dir}",
                                                    title_fg='#5CFF74',
                                                    alt_fg='skyblue')
 
