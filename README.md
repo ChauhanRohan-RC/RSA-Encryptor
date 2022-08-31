@@ -4,8 +4,8 @@
 
 * Uses strong asymmetric RSA Encryption algorithm
 * Supports every type of file format
-* Encrypt multiple files (of any type) in a single Batch Encryptied File (BEF) 
-* Encypted file locking and antitamper protection on Unautorised Access
+* Encrypt multiple files (of any type) in a single Batch Encrypted File (BEF) 
+* Encrypted file locking and antitamper protection on Unautorised Access
 * Both Command Line (CLI) and User Interface (GUI) versions
 
 # Usage
