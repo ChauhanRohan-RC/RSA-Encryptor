@@ -1,6 +1,6 @@
 # RCRYPT Encryption Software
 
-#### An un-symmetric RSA Encryption Software written in python
+#### An asymmetric RSA Encryption Software written in python
 ###### See also  
 [Fourier Series Simulation](https://github.com/ChauhanRohan-RC/Fourier-Series.git)  
 [3D N*N Rubik's Cube solver-AI](https://github.com/ChauhanRohan-RC/Cube.git)  
