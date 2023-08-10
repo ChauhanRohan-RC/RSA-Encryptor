@@ -11,7 +11,7 @@ def format_path(path, chars=30, start_weight=0.7):
     :param path: file path
     :param chars: no of chars in formatted file path
     :param start_weight: weight of head of file path (excluding extension) in output
-    :return: formattedd file path
+    :return: formatted file path
     """
     if len(path) <= chars:
         return path
@@ -26,13 +26,9 @@ def get_name(path: str, with_ext: bool = True):
     return n if with_ext else os.path.splitext(n)[0]
 
 
-def format_mills(mills, out='tuple'):
-    sec_ = mills // 1000
-    min_, sec_ = divmod(sec_, 60)
-    hr_, min_ = divmod(min_, 60)
-    if out == 'tuple':
-        return f'{hr_:02d}', f'{min_:02d}', f'{sec_:02d}'
-    return f'{hr_:02d} hr {min_:02d} min {sec_:02d} sec'
+def __format_time_component(val, label: str):
+    val = int(round(val))
+    return f'{val} {label}' if val > 0 else ""
 
 
 def format_secs(secs, out='str'):
@@ -40,7 +36,15 @@ def format_secs(secs, out='str'):
     hr_, min_ = divmod(min_, 60)
     if out == 'tuple':
         return f'{hr_:02d}', f'{min_:02d}', f'{sec_:02d}'
-    return f'{hr_:02d} hr {min_:02d} min {sec_:02d} sec'
+
+    return " ".join(fmt for fmt in (__format_time_component(hr_, 'hr'),
+                                    __format_time_component(min_, 'min'),
+                                    __format_time_component(sec_, 'sec')) if len(fmt) > 0)
+
+
+def format_mills(mills, out='tuple'):
+    return format_secs(mills // 1000, out=out)
+
 # ..................................................................................
 
 
@@ -105,7 +109,7 @@ class C:
     DecFailed = 1
     DecLocked = 2
     DecChances = 3
-    AccessRegainTime = 0.1  # minutes to able to retry the decryption
+    AccessRegainTime = 2  # minutes to able to retry the decryption
     AccessRegainSecs = round(AccessRegainTime * 60)
     MaxFailChances = 3  # after which it get locked and can only be decrypted by expert dec key
 
@@ -151,7 +155,9 @@ class C:
         # "product_sans_light.ttf",
         "product_sans_medium.ttf",
         "product_sans_regular.ttf",
-        # "product_sans_thin.ttf"
+        # "product_sans_thin.ttf",
+        "aquire.otf",
+        "aquire_light.otf"
     ]
 
 

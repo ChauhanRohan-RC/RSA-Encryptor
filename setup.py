@@ -12,17 +12,17 @@ base = "Win32GUI"
 main_crypt = Executable(script="UI.__init__.py",
                         icon=ImPaths.MainIcon,
                         base=base,
-                        targetName=C.ExeName)
+                        target_name=C.ExeName)
 
 reg_exe = Executable(script='reg.py',
                      icon=ImPaths.MainIcon,
                      base=base,
-                     targetName=C.RegExeName)
+                     target_name=C.RegExeName)
 
 un_exe = Executable(script='Uninstall.py',
                     icon=ImPaths.DecIcon,
                     base=base,
-                    targetName=C.UnInstallExeName)
+                    target_name=C.UnInstallExeName)
 
 setup(name=C.ExeName,
       version=C.Version,

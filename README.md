@@ -1,27 +1,64 @@
-.............................................   RCRYPT   (RC @April 12, 2020) .........................................
+# RCRYPT Encryption Software
 
-# A strong RSA Encryption Software
+#### An un-symmetric RSA Encryption Software written in python
+###### See also  
+[Fourier Series Simulation](https://github.com/ChauhanRohan-RC/Fourier-Series.git)  
+[3D N*N Rubik's Cube solver-AI](https://github.com/ChauhanRohan-RC/Cube.git)  
+[OCR Neural Network](https://github.com/ChauhanRohan-RC/OCR-AI.git)
 
-* Uses strong asymmetric RSA Encryption algorithm
-* Supports every type of file format
-* Encrypt multiple files (of any type) in a single Batch Encrypted File (BEF) 
-* Encrypted file locking and antitamper protection on Unautorised Access
+![Encryption Flow](graphics/enc_flow.png)
+
+## Algorithm
+* Uses a strong asymmetric RSA Encryption algorithm
 * Both Command Line (CLI) and User Interface (GUI) versions
+* Supports every type of file format, including but not limited to 
+  * text files : transformer-based encryption protocol for utf encoded files
+  * images : Bitmap encoding to BASE64
+  * audio-video and multimedia
+  * Any other binary file
+* Encrypt multiple files (of any type) in a single Batch Encrypted File (BEF) 
 
-# Usage
+## Security Features
+![File Lockdown](graphics/file_lockdown.png)
+* Encrypted file locking after every unauthorized attempt
+* Permanent lockdown after several unsuccessful attempts
+* Read-Write restrictions
+* Anti-tamper protection from ransomware and resource abuse
 
-* For Command Line version, download and run "exe/CLI/Rcrypt.exe"
+####
+![Decryption Flow](graphics/dec_flow.png)
 
-* For GUI version, Extract "exe/GUI/setup.zip" and install the software
-* To start RCrypt,  run RCrypt.exe
-* To Encrypt multiple files, select the desired files in the explorer -> Right Click (context menu)-> Send To -> Add to Encrypted File
+## Usage
+### Windows
+* Command Line interface executable: [Rcrypt CLI](exe/CLI/Rcrypt%20CLI.exe)
+* GUI setup zip: [Rcrypt Setup](exe/GUI/Rcrypt_setup.zip)
+* To start RCrypt, run `RCrypt.exe`
+* To Encrypt multiple files at once, select the files and  
+`Right Click (context menu)-> Send To -> Add to Encrypted File`
+* To fix registry entries, go the installation folder and run `REG.exe`
+* To uninstall the software, go to control panel. Alternatively, go to installation folder and run `Uninstall.exe` 
 
-# Registry Fix 
+### Python
+* clone the repository  
+`git clone https://github.com/ChauhanRohan-RC/RSA-Encryptor.git`
+* For the command line interface, open the terminal and run  
+`python CLI.py`
 
-* To fix registry problems, head to installation directory and run REG.exe
-* It will reset all registry setting for the program...
+####
+![Command Line Interface](graphics/cli.png)
+####
 
-# Support
+* For the GUI version, open the terminal and run
+`python UI.__init__.py`
+* For the registry fixes (windows only), run command  
+`python reg.py`
 
-Contact If file gets locked due to multiple Unauthorised Access
-* E-mail: com.production.rc@gmail.com
+## Support
+* E-mail: `com.production.rc@gmail.com`
+* To report any bugs or suggestions, open an issue on GitHub or contact via E-mail. 
+* If the encrypted file gets locked due to multiple Unauthorised Access, send a mail to above address
+
+## Connect on
+[Twitter](https://twitter.com/0rc_studio)  
+[YouTube](https://www.youtube.com/channel/UCmyvutGWtyBRva_jrZfyORA)  
+[Google Play Store](https://play.google.com/store/apps/dev?id=7315303590538030232)

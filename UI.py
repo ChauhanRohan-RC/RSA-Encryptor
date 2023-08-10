@@ -33,7 +33,7 @@ b_hoverbg = abg
 b_hoverfg = afg
 
 # Menu Buttons
-menu_b_font = ("product sans medium", 13)
+menu_b_font = ("aquire", 13)
 menu_b_relief = 'flat'
 menu_b_bd = 0
 
