@@ -1,27 +1,36 @@
-# RCRYPT Encryption Software
+# RCrypt: RSA Encryption Software
 
-#### An asymmetric RSA Encryption Software written in python
+An Encryption Software made from scratch in python, based on the asymmetric RSA cryptographic system
+
+##### Watch Demonstrations on YouTube
+[RCrypt Playlist](https://www.youtube.com/playlist?list=PL_oeaRvQxDbSbeZ1X5A_xxczKjxGeQTvH)  
+[Rcrypt Command Line Interface](https://youtu.be/RJWuZjVnxG8)  
+[Rcrypt Graphical User Interface](https://youtu.be/fG_VI7kVobM)  
+
 ###### See also  
 [Fourier Series Simulation](https://github.com/ChauhanRohan-RC/Fourier-Series.git)  
 [3D N*N Rubik's Cube solver-AI](https://github.com/ChauhanRohan-RC/Cube.git)  
-[OCR Neural Network](https://github.com/ChauhanRohan-RC/OCR-AI.git)
+[Path Finder Simulation](https://github.com/ChauhanRohan-RC/PathFinder.git)
 
-![Encryption Flow](graphics/enc_flow.png)
+![Cover](graphics/thumb.png)
 
 ## Algorithm
-* Uses a strong asymmetric RSA Encryption algorithm
+* Uses a custom encryption algorithm with separate implementations for text and binary data, based on the asymmetric RSA Cryptographic system
 * Both Command Line (CLI) and User Interface (GUI) versions
 * Supports every type of file format, including but not limited to 
   * text files : transformer-based encryption protocol for utf encoded files
   * images : Bitmap encoding to BASE64
   * audio-video and multimedia
   * Any other binary file
-* Encrypt multiple files (of any type) in a single Batch Encrypted File (BEF) 
+* Encrypt multiple files (of any type) in a single Batch Encrypted File (BEF)
+
+![Encryption Flow](graphics/enc_flow.png)
 
 ## Security Features
 ![File Lockdown](graphics/file_lockdown.png)
-* Encrypted file locking after every unauthorized attempt
-* Permanent lockdown after several unsuccessful attempts
+* Initial Encrypted file lockdown after 3 unauthorized attempts
+* After the initial lockdown, cooldown time increases exponentially with each unauthorized attempt
+* Permanent lockdown after repeated unauthorized attempts
 * Read-Write restrictions
 * Anti-tamper protection from ransomware and resource abuse
 

@@ -5,16 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="fd5d44c8-73b9-4eec-9636-a6ae14497103" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/exe/CLI/Rcrypt CLI.exe" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/Encryption.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Encryption.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/UI.py" beforeDir="false" afterPath="$PROJECT_DIR$/UI.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/__c.py" beforeDir="false" afterPath="$PROJECT_DIR$/__c.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/exe/CLI/Rcrypt CLI v6.0.0.exe" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/exe/GUI/Rcrypt_setup_v6.0.0.zip" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/graphics/enc_flow.png" beforeDir="false" afterPath="$PROJECT_DIR$/graphics/enc_flow.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/graphics/enc_flow.svg" beforeDir="false" afterPath="$PROJECT_DIR$/graphics/enc_flow.svg" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -43,14 +39,14 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/RC/Projects/Pycharm/Encryption/exe/GUI/Rcrypt_setup_v6.0.0&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "git-widget-placeholder": "main",
+    "ignore.virus.scanning.warn.message": "true",
+    "last_opened_file_path": "D:/RC/Projects/Pycharm/Encryption",
+    "settings.editor.selected.configurable": "preferences.fileTypes"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\RC\Projects\Pycharm\Encryption\exe\GUI\Rcrypt_setup_v6.0.0" />
@@ -62,7 +58,7 @@
       <recent name="D:\RC\Projects\Pycharm\Encryption\sdk" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.UI.__init__">
+  <component name="RunManager" selected="Python.python CLI.py">
     <configuration name="CLI" type="PythonConfigurationType" factoryName="Python">
       <module name="Encryption" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -71,6 +67,7 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="C:\Users\RC\AppData\Local\Programs\Python\Python37-32\python.exe" />
+      <option name="SDK_NAME" value="Python 3.10" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
       <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
@@ -113,12 +110,32 @@
         <env name="PYTHONUNBUFFERED" value="1" />
       </envs>
       <option name="SDK_HOME" value="C:\Users\RC\AppData\Local\Programs\Python\Python37-32\python.exe" />
-      <option name="SDK_NAME" value="Python 3.7" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
       <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/pack_setup_info.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="python CLI.py" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="Encryption" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="CLI.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -205,9 +222,15 @@
       <item itemvalue="Python.pack_setup_info" />
       <item itemvalue="Python.test2" />
       <item itemvalue="Python.test" />
+      <item itemvalue="Python.python CLI.py" />
       <item itemvalue="Shell Script.cx_setup" />
       <item itemvalue="Shell Script.build_cli" />
     </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.python CLI.py" />
+      </list>
+    </recent_temporary>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="SvnConfiguration">
