@@ -5,12 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="fd5d44c8-73b9-4eec-9636-a6ae14497103" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/Encryption.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Encryption.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/graphics/enc_flow.png" beforeDir="false" afterPath="$PROJECT_DIR$/graphics/enc_flow.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/graphics/enc_flow.svg" beforeDir="false" afterPath="$PROJECT_DIR$/graphics/enc_flow.svg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CLI.py" beforeDir="false" afterPath="$PROJECT_DIR$/CLI.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/UI.py" beforeDir="false" afterPath="$PROJECT_DIR$/UI.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/__c.py" beforeDir="false" afterPath="$PROJECT_DIR$/__c.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backup.zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crypt_api.py" beforeDir="false" afterPath="$PROJECT_DIR$/crypt_api.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/exe/CLI/Rcrypt CLI.exe" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/jkkguyv523asdasd.py" beforeDir="false" afterPath="$PROJECT_DIR$/jkkguyv523asdasd.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,14 +42,14 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "git-widget-placeholder": "main",
-    "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "D:/RC/Projects/Pycharm/Encryption",
-    "settings.editor.selected.configurable": "preferences.fileTypes"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/RC/Projects/Pycharm/Encryption&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.fileTypes&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\RC\Projects\Pycharm\Encryption\exe\GUI\Rcrypt_setup_v6.0.0" />
@@ -58,7 +61,7 @@
       <recent name="D:\RC\Projects\Pycharm\Encryption\sdk" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.python CLI.py">
+  <component name="RunManager" selected="Shell Script.build_cli">
     <configuration name="CLI" type="PythonConfigurationType" factoryName="Python">
       <module name="Encryption" />
       <option name="INTERPRETER_OPTIONS" value="" />

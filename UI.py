@@ -549,15 +549,15 @@ class EncUi(Frame):
             self.enc.names.append(os.path.basename(_path))
             self.enc.data_codes.append(str(_data_code))
             self.enc.o_batch_size += _f_size
-            self.enc.o_batch_cal_size += _f_size if _data_code == self.enc.text_code else get_new_pos(_f_size,
-                                                                                                      self.enc.chunk_size,
-                                                                                                      0)
+            self.enc.total_batch_cal_size += _f_size if _data_code == self.enc.text_code else get_new_pos(_f_size,
+                                                                                                          self.enc.chunk_size,
+                                                                                                          0)
 
         self.progress_frame.set('meta', out_f_name, 0.00)
         logger.log('Encryption : Configuring encrypted file, Meta Information collected successfully')
 
         meta_bytes = bytes(
-            f'{self.enc.meta_base}{self.enc.p}{self.enc.meta_base}{self.enc.q}{self.enc.meta_base}{self.enc.encrypt_int(enc_key_index, self.enc._enc_key)}' +
+            f'{self.enc.meta_base}{self.enc.p}{self.enc.meta_base}{self.enc.q}{self.enc.meta_base}{self.enc.encrypt_int(enc_key_index, self.enc.primary_enc_key)}' +
             f'{self.enc.meta_base}{self.enc.encrypt_str(self.enc.encrypt_str(user_pass, enc_key), enc_key)}{self.enc.meta_base}' +
             f'{self.enc.encrypt_str(f"{self.enc.name_base}".join(self.enc.names), enc_key)}{self.enc.meta_base}' +
             f'{self.enc.encrypt_str(f"{self.enc.data_code_base}".join(self.enc.data_codes), enc_key)}{self.enc.meta_base}',
@@ -592,9 +592,9 @@ class EncUi(Frame):
 
                             b__f.write(chunk)
                             b__f.write(self.enc.file_data_base)
-                            self.enc.r_batch_size += _f_size
+                            self.enc.read_batch_size += _f_size
                             self.progress_frame.set('data', _name,
-                                                    (self.enc.r_batch_size / self.enc.o_batch_cal_size) * 100)
+                                                    (self.enc.read_batch_size / self.enc.total_batch_cal_size) * 100)
                             logger.log('Encryption : << %s >> encrypted successfully' % _name)
                         else:
                             logger.log('Encryption : Encrypting << %s >> | DATA TYPE : Bytes | FILE SIZE : %s Bytes' % (
@@ -604,9 +604,9 @@ class EncUi(Frame):
                                     break
                                 chunk.reverse()  # main_cli bytes encryption logic
                                 b__f.write(chunk)
-                                self.enc.r_batch_size += self.enc.chunk_size
+                                self.enc.read_batch_size += self.enc.chunk_size
                                 self.progress_frame.set('data', _name,
-                                                        (self.enc.r_batch_size / self.enc.o_batch_cal_size) * 100)
+                                                        (self.enc.read_batch_size / self.enc.total_batch_cal_size) * 100)
                             b__f.write(self.enc.file_data_base)
                             logger.log('Encryption : << %s >> encrypted successfully' % _name)
 

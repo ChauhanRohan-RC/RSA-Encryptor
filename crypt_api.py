@@ -1,53 +1,77 @@
+import math
 import os
 import sys
 import secrets
 import time
+from collections.abc import Iterable
 from stat import S_IWUSR, S_IREAD, S_IRGRP, S_IROTH
-
 
 # Constants used as default in instances
 EncExt = ".rce"
 
-# Encryption Constants
-MinLimit = 12                   # min prime limit
-MaxLimit = 40                   # max prime limit
+# ...........................  Encryption Constants  ............................
+# # Minimum value of N = p * q. Original data should always be less than this value
+# # Currently 256, which support encryption of 255 (8 bits) at max
+# MIN_N = 1 << 8
+
+# # Maximum value of N = p * q. Limits the size of encrypted data
+# # currently 2^16 - 1 (or 16 bits), which limits encrypted data to 2 bytes
+# MAX_N = (1 << 16) - 1           # Max value of N
+
+"""
+Structure
+
+Encryption: original unit (ORG_UNIT_BYTES) ---> encrypted unit (ENC_UNIT_BYTES)
+Decryption: encrypted unit (ENC_UNIT_BYTES) ---> original unit (ORG_UNIT_BYTES)
+
+NOTE: encrypted unit must always be BIGGER THAN ORIGINAL UNIT to account for primes and decryption artifacts
+"""
+
+# Maximum size (in bytes) of the original data to be treated as a unit of encryption (an integer)
+ORG_UNIT_BYTES = 2
+
+# Size (in bytes) of the encrypted data that is decrypted to one original unit
+ENC_UNIT_BYTES = ORG_UNIT_BYTES + 1
+
+CHUNK_UNITS = 100  # Number of original/encrypted units in a chunk
 
 # Decryption Constants
-DecNormal = 0                   # no fail decryption attempts yet
-DecFailed = 1                   # at least 1 fail decryption attempt
-DecLocked = 2                   # max fail decryption attempts
+DecNormal = 0  # no fail decryption attempts yet
+DecFailed = 1  # at least 1 fail decryption attempt
+DecLocked = 2  # max fail decryption attempts
 
-DecChances = 3                  # Max decryption Chances
-AccessRegainTime = 10           # minutes to able to retry the decryption
-AccessRegainSecs = round(AccessRegainTime * 60)
-MaxFailChances = 5              # after which it get locked and can only be decrypted by expert dec key
+DecChancesPerTry = 3  # Max decryption Chances per try
+MaxFailTries = 3    # after which it get locked and can only be decrypted by expert dec key
+
+# Access regain secs = base * exp(exponent * fail_count)
+AccessRegainSecsBase = round(5 * 60)   # 5 min
+AccessRegainSecsExponent = 1
 
 # Encodings
-MetaEncoding = 'utf-8'          # Meta and Pointer Data Encoding
-TextEncoding = 'utf-8'          # Text File Data Encoding
-TextCode = 2                    # indicate Text File
-ByteCode = 3                    # indicate Bytes File (Non Text)
+MetaEncoding = 'utf-8'  # Meta and Pointer Data Encoding
+TextEncoding = 'utf-8'  # Text File Data Encoding
+TextCode = 2  # indicate Text File
+ByteCode = 3  # indicate Bytes File (Non Text)
 
 # Sizes (in Bytes) ......................................................
-ChunkSize = 4096                # Bytes to read at a time
-PointerSize = 40960             # Header byte size that stores pointers and decryption data (Pointer Room)
-VoidByteArraySize = 29          # size of empty bytearray object in bytes
-VoidByteSize = 17               # size of empty byte object in bytes
+PointerSize = 40960  # Header byte size that stores pointers and decryption data (Pointer Room)
+# VoidByteArraySize = sys.getsizeof(bytearray())  # size of empty bytearray object in bytes
+# VoidByteSize = sys.getsizeof(bytes())  # size of empty byte object in bytes
 
 # ..............................   Separators   .....................
-TextBase = ':'                  # joins encrypted ints in a string
+TextBase = ':'  # joins encrypted ints in a string
 
 # In Meta Data
-MetaBase = '||'                 # joins and surrounds meta data
-NameBase = '#'                  # joins file names in meta
-DataTypeBase = '#'              # joins data type code of files (2 : text file, 3 : bytes) in meta
+MetaBase = '||'  # joins and surrounds meta data
+NameBase = '#'  # joins file names in meta
+DataTypeBase = '#'  # joins data type code of files (2 : text file, 3 : bytes) in meta
 
 # In Pointer and Decryption Data
-PointerBase = '/'               # joins and surround pointers
-DecCodeBase = '<<'              # joins and surround decryption data  (decryption_code, no_of_fails, timestamp)
-PointerDecSeparator = '%%'      # separates pointer and decryption data string in pointer room
+PointerBase = '/'  # joins and surround pointers
+DecCodeBase = '<<'  # joins and surround decryption data  (decryption_code, no_of_fails, timestamp)
+PointerDecSeparator = '%%'  # separates pointer and decryption data string in pointer room
 
-FileDataBase = bytes('__{{||}}__', encoding=TextEncoding)       # used at the end of individual encrypted file data
+# FileDataBase = bytes('__{{||}}__', encoding=TextEncoding)  # used at the end of individual encrypted file data
 
 
 #  ............................................ Static Functions....................................
@@ -78,18 +102,46 @@ def is_prime(n):
     return True
 
 
-def get_ascii(string):
-    """ return generator object having ascii code of each char """
+def exp_mod(x, y, p):
+    """
+    Fast modulo exponentiation algorithm
+
+    @:return (x^y) % p
+    """
+    res = 1  # Initialize result
+    x = x % p  # Update x if it is more than or equal to p
+
+    if x == 0:
+        return 0
+
+    while y > 0:
+        # If y is odd, multiply x with result
+        if y & 1:
+            res = (res * x) % p
+
+        # y must be even now
+        y = y >> 1  # y = y/2
+        x = (x * x) % p
+    return res
+
+
+def to_unicode_arr(string: str):
+    """ return generator object having unicode code of each char """
     return (ord(i) for i in string)
+
+
+def from_unicode_arr(unc_arr: Iterable) -> str:
+    """ return generator object having characters for each unicode code point """
+    return ''.join(map(chr, unc_arr))
 
 
 def read_byte(fd, size=4096):
     return fd.read(size)
 
 
-def yield_byte(fd, size=4096):
+def yield_byte(fd, size=4096, mutable=True):
     for chunk in iter(lambda _f=fd, _s=size: read_byte(_f, _s), b''):
-        yield bytearray(chunk)
+        yield bytearray(chunk) if mutable else chunk
 
 
 def is_fd_textfile(fd, chunk_size=102400, encoding='utf-8'):
@@ -121,11 +173,11 @@ def is_path_textfile(path, chunk_size=102400, encoding='utf-8'):
             return True
 
 
-def get_filesize(fd):
+def get_file_size(fd):
     """
     :param fd: file descriptor object
    """
-    _p_pos = fd.tell()   # file position to be restored later
+    _p_pos = fd.tell()  # file position to be restored later
     # ...............
     fd.seek(0, 2)
     _file_size = fd.tell()
@@ -193,11 +245,11 @@ def create_batch_file_name(primary_dir, names) -> str:
     return f'{names[0]} (encrypted)'
 
 
-def get_new_pos(pos, chunk_size, start=0):
+def get_new_pos(cur_pos, chunk_size, start=0):
     """ to get size multiple of chunk size """
-    _size = pos - start
+    _size = cur_pos - start
     _q, _r = divmod(_size, chunk_size)
-    return pos if _r == 0 else (start + ((_q + 1) * chunk_size))
+    return cur_pos if _r == 0 else (start + ((_q + 1) * chunk_size))
 
 
 def read_only(file_path):
@@ -232,134 +284,207 @@ def is_writable(path):
         return True
 
 
-def generate_random_p_q(min_limit, max_limit):
-    primes = [i for i in range(min_limit, max_limit) if is_prime(i)]      # prime numbers in range
-    prime1, prime2 = secrets.choice(primes), secrets.choice(primes)
-    while prime1 == prime2:
-        prime2 = secrets.choice(primes)
-    return prime1, prime2
+# def generate_random_p_q(min_limit, max_limit):
+#     primes = [i for i in range(min_limit, max_limit) if is_prime(i)]      # prime numbers in range
+#     prime1, prime2 = secrets.choice(primes), secrets.choice(primes)
+#     while prime1 == prime2:
+#         prime2 = secrets.choice(primes)
+#     return prime1, prime2
+
+def generate_random_p_q(min_n, max_n):
+    primes = [i for i in range(math.ceil(math.sqrt(min_n)), math.floor(math.sqrt(max_n))) if
+              is_prime(i)]  # prime numbers in range
+    p, q = secrets.choice(primes), secrets.choice(primes)
+    while p == q:
+        q = secrets.choice(primes)
+    return p, q
+
+def get_bit_mask(n_bytes):
+    res = 0
+    while n_bytes > 0:
+        res = (res << 8) | 0xFF
+        n_bytes -= 1
+
+    return res
+
+
+def bytes_to_int(arr: bytes) -> int:
+    return int.from_bytes(arr, byteorder=sys.byteorder, signed=False)
+
+
+def int_to_bytes(i: int, n_bytes: int) -> bytes:
+    return i.to_bytes(n_bytes, byteorder=sys.byteorder, signed=False)
 
 
 # ............................... Classes .....................
-class Encryptor:
-    def __init__(self, prime1=None, prime2=None, min_limit=12, max_limit=40, text_base=':'):
 
-        """ take p and q such that they are prime and p*q > max of original value (no in ascii table) """
-        self.min_limit = min_limit
-        self.max_limit = max_limit
+class Base:
 
-        if not prime1 or min_limit > prime1 > max_limit or not prime2 or min_limit > prime2 > max_limit:
-            prime1, prime2 = generate_random_p_q(min_limit, max_limit)
+    def __init__(self, prime1=None, prime2=None, auto_generate_primes=False, org_unit_bytes=ORG_UNIT_BYTES, enc_unit_bytes=ENC_UNIT_BYTES,
+                 chunk_units=CHUNK_UNITS, text_base=':'):
 
-        self.p = prime1
-        self.q = prime2
-        self.n = self.p * self.q
-        self.pn = (self.p - 1) * (self.q - 1)
-        self.text_base = text_base  # used to join encrypted data
+        self.org_unit_bytes = org_unit_bytes
+        self.enc_unit_bytes = enc_unit_bytes
 
-        self.enc_keys = self.get_enc_keys()
-        self._enc_key = self.enc_keys[0]
+        self.org_chunk_size = org_unit_bytes * chunk_units  # should be a multiple of org_unit_bytes
+        self.enc_chunk_size = enc_unit_bytes * chunk_units  # should be a multiple of enc_unit_bytes
+
+        # Primes (uninitialized)
+        self.p, self.q = None, None
+        self.n = None
+        self.pn = None
+        self.enc_keys = None
+        self.primary_enc_key = None
+        self.primary_dec_key = None
 
         # constants worth attributing
-        self.void_bytearray_size = VoidByteArraySize
-        self.void_byte_size = VoidByteSize
+        self.text_base = text_base  # used to join encrypted data
         self.text_code = TextCode
         self.byte_code = ByteCode
 
-    def get_enc_keys(self):
-        return [i for i in range(2, self.pn) if co_prime(i, self.n) and co_prime(i, self.pn)]
+        if not (prime1 and prime2) and auto_generate_primes:
+            prime1, prime2 = generate_random_p_q(1 << (org_unit_bytes * 8), 1 << (enc_unit_bytes * 8))
 
-    def encrypt_int(self, val, key):
-        return (val ** key) % self.n
+        if prime1 and prime2:
+            self.init(prime1, prime2)
 
-    def encrypt_str(self, string, key=None):
+    def is_initialized(self):
+        return self.p and self.q
+
+    def init(self, p, q):
+        self.p, self.q = p, q
+        self.n = self.p * self.q
+        self.pn = (self.p - 1) * (self.q - 1)
+
+        self.enc_keys = self.get_enc_keys(1)     # performance limiting
+        self.primary_enc_key = self.enc_keys[0]  # first enc key
+        self.primary_dec_key = self.get_dec_keys(self.primary_enc_key, 1)[0]  # first dec key of first enc key
+
+    def get_enc_keys(self, count: int = 1) -> list:
+        res = []
+        if count < 1:
+            return res
+
+        for i in range(2, self.pn):
+            if co_prime(i, self.n) and co_prime(i, self.pn):
+                res.append(i)
+                if len(res) >= count:
+                    break
+
+        return res
+
+    def get_dec_keys(self, enc_key, count):
+        res = []
+        if count < 1:
+            return res
+
+        primary_dec_key = 0
+        for i in range(1, self.pn * count):
+            if (enc_key * i) % self.pn == 1:
+                primary_dec_key = i
+                break
+
+        for j in range(count):
+            res.append(primary_dec_key + (j * self.pn))
+        return res
+
+
+class Encryptor(Base):
+
+    def __init__(self, prime1=None, prime2=None, org_unit_bytes=ORG_UNIT_BYTES, enc_unit_bytes=ENC_UNIT_BYTES,
+                 text_base=':'):
+
+        Base.__init__(self, prime1=prime1, prime2=prime2, auto_generate_primes=True, org_unit_bytes=org_unit_bytes, enc_unit_bytes=enc_unit_bytes, text_base=text_base)
+
+    def encrypt_int(self, val, key) -> int:
+        return exp_mod(val, key, self.n)
+
+    def encrypt_int_default(self, val) -> int:
+        return self.encrypt_int(val, self.primary_enc_key)
+
+    def encrypt_int_arr(self, int_arr, key: int) -> map:
+        return map(lambda v: self.encrypt_int(v, key), int_arr)
+
+    def encrypt_bytes(self, byte_array: bytes, key: int = None) -> bytearray:
+        if not key:
+            key = self.primary_enc_key
+
+        res = bytearray()
+        for i in range(0, len(byte_array), self.org_unit_bytes):
+            o = bytes_to_int(byte_array[i:i + self.org_unit_bytes])  # load original data
+            e = self.encrypt_int(o, key)  # encrypt
+            res.extend(int_to_bytes(e, self.enc_unit_bytes))  # dump encrypted data
+
+        return res
+
+    def encrypt_str(self, string, key=None) -> str:
         """
         :return: str having encrypted ascii codes of string separated by TextBase
         """
         if key is None:
-            key = self._enc_key
-        _gen = get_ascii(string)
+            key = self.primary_enc_key
+        _gen = to_unicode_arr(string)
         return self.text_base.join(str(self.encrypt_int(i, key)) for i in _gen)
 
-    def encrypt_seq(self, seq, key=None):
+    def encrypt_string_arr(self, str_arr, key=None):
         """
         seq: sequence containing strings
         :return: generator having encrypted strings
         """
-        return (self.encrypt_str(i, key) for i in seq)
+        return (self.encrypt_str(i, key) for i in str_arr)
 
 
-class Decryptor:
-    def __init__(self, prime1=None, prime2=None, text_base=':'):
+class Decryptor(Base):
+    def __init__(self, prime1=None, prime2=None, org_unit_bytes=ORG_UNIT_BYTES, enc_unit_bytes=ENC_UNIT_BYTES,
+                 text_base=':'):
 
-        if prime1 and prime2:
-            self.p, self.q = prime1, prime2
-            self.n = self.p * self.q
-            self.pn = (self.p - 1) * (self.q - 1)
-
-            self.enc_keys = self.get_enc_keys()
-            self._enc_key = self.enc_keys[0]  # first enc key
-            self._dec_key = self.get_dec_keys(self._enc_key, 2)[0]  # first dec key of first enc key
-
-        self.text_base = text_base  # used to split encrypted data
-
-        # constants worth attributing
-        self.void_bytearray_size = VoidByteArraySize
-        self.void_byte_size = VoidByteSize
-        self.text_code = TextCode
-        self.byte_code = ByteCode
+        Base.__init__(self, prime1=prime1, prime2=prime2, auto_generate_primes=False, org_unit_bytes=org_unit_bytes,
+                      enc_unit_bytes=enc_unit_bytes, text_base=text_base)
 
         # attrs set by set_meta_info, common to both decrypting file or batch file
         self.work_enc_key = -1  # enc key used in given meta
         self.work_dec_key = -1  # first dec key of work enc key
         self.user_pass = ''
 
-    def set_primes(self, p, q):
-        self.p, self.q = p, q
-        self.n = self.p * self.q
-        self.pn = (self.p - 1) * (self.q - 1)
-
-        self.enc_keys = self.get_enc_keys()
-        self._enc_key = self.enc_keys[0]
-        self._dec_key = self.get_dec_keys(self._enc_key, 2)[0]
-
-    def get_enc_keys(self):
-        return [i for i in range(2, self.pn) if co_prime(i, self.n) and co_prime(i, self.pn)]
-
-    def get_dec_gen(self, enc_key, limit=10 ** 5):
-        return (i for i in range(1, limit) if (enc_key * i) % self.pn == 1)
-
-    def get_dec_keys(self, enc_key, num=1):
-        return list(self.get_dec_gen(enc_key, num * self.pn))
-
     def decrypt_int(self, val, dec_key):
-        return (val ** dec_key) % self.n
+        return exp_mod(val, dec_key, self.n)
+
+    def decrypt_int_arr(self, int_arr, dec_key: int) -> map:
+        return map(lambda v: self.decrypt_int(v, dec_key), int_arr)
+
+    def decrypt_bytes(self, byte_array: bytes, dec_key: int = None) -> bytearray:
+        if not dec_key:
+            dec_key = self.primary_dec_key
+
+        res = bytearray()
+        for i in range(0, len(byte_array), self.enc_unit_bytes):
+            e = bytes_to_int(byte_array[i:i + self.enc_unit_bytes])  # load encrypted data
+            o = self.decrypt_int(e, dec_key)  # decrypt
+            res.extend(int_to_bytes(o, self.org_unit_bytes))  # dump decrypted (original) data
+
+        return res
 
     @staticmethod
-    def _str_to_int(_str):
+    def _str_to_int(_str: str):
         # to protect enc_str splitting to empty strings
         return int(_str) if _str else -1
 
     def decrypt_str(self, enc_str, dec_key):
-        return ''.join(chr(self.decrypt_int(i, dec_key)) for i in map(self._str_to_int, enc_str.split(self.text_base)) if i != -1)
+        return from_unicode_arr((self.decrypt_int(i, dec_key) for i in map(self._str_to_int, enc_str.split(self.text_base)) if i != -1))
 
-    def decrypt_seq(self, enc_seq, dec_key):
-        return (self.decrypt_str(i, dec_key) for i in enc_seq)
-
-    @staticmethod
-    def _decode_byte(byte, encoding='utf-8'):
-        return byte.decode(encoding)
+    # def decrypt_seq(self, enc_seq, dec_key):
+    #     return (self.decrypt_str(i, dec_key) for i in enc_seq)
 
 
 class EncBatch(Encryptor):
     """ for encrypting batch of files """
-    def __init__(self, min_minit=MinLimit, max_limit=MaxLimit, text_encoding=TextEncoding, chunk_size=ChunkSize, meta_base=MetaBase, meta_encoding=MetaEncoding,
-                 pointer_base=PointerBase, pointer_size=PointerSize, name_base=NameBase, data_code_base=DataTypeBase,
-                 file_data_base=FileDataBase, dec_code_base=DecCodeBase, pointer_dec_separator=PointerDecSeparator):
 
-        Encryptor.__init__(self, min_limit=min_minit, max_limit=max_limit, text_base=TextBase)
+    def __init__(self, org_unit_bytes=ORG_UNIT_BYTES, enc_unit_bytes=ENC_UNIT_BYTES, chunk_units=CHUNK_UNITS,
+                 text_encoding=TextEncoding, meta_base=MetaBase, meta_encoding=MetaEncoding,
+                 pointer_base=PointerBase, pointer_size=PointerSize, name_base=NameBase, data_code_base=DataTypeBase, dec_code_base=DecCodeBase, pointer_dec_separator=PointerDecSeparator):
 
-        self.chunk_size = chunk_size         # specific
+        Encryptor.__init__(self, org_unit_bytes=org_unit_bytes, enc_unit_bytes=enc_unit_bytes, text_base=TextBase)
+
         self.text_encoding = text_encoding
 
         # meta attrs
@@ -368,30 +493,32 @@ class EncBatch(Encryptor):
 
         # pointer attrs
         self.pointer_base = pointer_base
-        self.pointer_size = pointer_size      # specific, includes pointers and decryption codes in form \p1\p2\p3\%%<<code<<no_of_fails<<timestamp<<
+        self.pointer_size = pointer_size
+        # specific, includes pointers and decryption codes in form
+        # \p1\p2\p3\%%<<code<<no_of_fails<<timestamp<<
 
         # dec code constants, decryption code is in form <<code<<no_of_fails<<timestamp<<
         self.dec_code_base = dec_code_base  # different form pointer base
         self.pointer_dec_code_sep = pointer_dec_separator
 
-        self.name_base = name_base            # specific
+        self.name_base = name_base  # specific
         self.data_code_base = data_code_base  # specific
-        self.file_data_base = file_data_base  # specific, added only in end of encrypted data
+        # self.file_data_base = file_data_base  # specific, added only in end of encrypted data
 
         self.names = []  # file names in batch, clear after every task
         self.data_codes = []  # data codes of files in batch in str form, cleared after every task
         self.pointers = []  # pointers of files in batch in str form, cleared after every task
 
-        self.b_f_path = ''     # output batch file path
+        self.b_f_path = ''  # output batch file path
         self.o_batch_size = 0  # sum of file sizes in batch
-        self.o_batch_cal_size = 0  # calibrated size of batch w.r.t to chunk size (only for calculating purposes)
-        self.r_batch_size = 0  # bytes read
+        self.total_batch_cal_size = 0  # calibrated size of batch w.r.t to chunk size (only for calculating purposes)
+        self.read_batch_size = 0  # bytes read
 
     def clear_cache(self):
         self.b_f_path = ''
         self.o_batch_size = 0
-        self.o_batch_cal_size = 0
-        self.r_batch_size = 0
+        self.total_batch_cal_size = 0
+        self.read_batch_size = 0
 
         self.names.clear()
         self.data_codes.clear()
@@ -401,21 +528,20 @@ class EncBatch(Encryptor):
         for fd in fd_seq:
             _name = os.path.basename(os.path.realpath(fd.name))
             _data_code = self.text_code if is_fd_textfile(fd) else self.byte_code
-            _f_size = get_filesize(fd)
+            _f_size = get_file_size(fd)
 
             self.names.append(_name)
             self.data_codes.append(str(_data_code))
             self.o_batch_size += _f_size
-            self.o_batch_cal_size += _f_size if _data_code == self.text_code else get_new_pos(_f_size, self.chunk_size, 0)
+            self.total_batch_cal_size += get_new_pos(_f_size, self.org_chunk_size,0)
 
-        return f'{self.meta_base}{self.p}{self.meta_base}{self.q}{self.meta_base}{self.encrypt_int(enc_key_index, self._enc_key)}' \
+        return f'{self.meta_base}{self.p}{self.meta_base}{self.q}{self.meta_base}{self.encrypt_int(enc_key_index, self.primary_enc_key)}' \
                f'{self.meta_base}{self.encrypt_str(self.encrypt_str(pass_word, enc_key), enc_key)}{self.meta_base}' \
                f'{self.encrypt_str(f"{self.name_base}".join(self.names), enc_key)}{self.meta_base}' \
                f'{self.encrypt_str(f"{self.data_code_base}".join(self.data_codes), enc_key)}{self.meta_base}'
 
     def get_meta_bytes(self, fd_seq, enc_key_index, pass_word, enc_key):
-        m_b = bytes(self.get_meta_str(fd_seq, enc_key_index, pass_word, enc_key), encoding=self.meta_encoding)
-        return m_b, sys.getsizeof(m_b) - self.void_byte_size
+        return self.get_meta_str(fd_seq, enc_key_index, pass_word, enc_key).encode(encoding=self.meta_encoding)
 
     def encrypt_batch(self, fd_seq, pass_word, b_f_path=None, enc_ext=EncExt, on_prog_call=lambda *args: print(args)):
         self.clear_cache()
@@ -425,8 +551,8 @@ class EncBatch(Encryptor):
         enc_key = self.enc_keys[enc_key_index]
 
         # 2. meta bytes
-        m_b, m_s = self.get_meta_bytes(fd_seq, enc_key_index, pass_word, enc_key)
-        self.pointers.append(str(self.pointer_size + m_s))  # first pointer
+        m_b = self.get_meta_bytes(fd_seq, enc_key_index, pass_word, enc_key)
+        enc_start_pos = self.pointer_size + len(m_b) + 2  # first pointer: start of first file encrypted data
 
         # 3. configuring path of output batch file
         if not b_f_path:  # out batch enc file
@@ -445,54 +571,68 @@ class EncBatch(Encryptor):
             on_prog_call('meta', self.b_f_path, 1)
             b__f.write(m_b)
 
+            b__f.seek(enc_start_pos, 0)
+
             # encryption
             for count, fd in enumerate(fd_seq, start=0):
-                __start_pos = b__f.tell()
+                _start_pos = b__f.tell()
+                self.pointers.append(_start_pos)
+
                 _name = os.path.basename(os.path.realpath(fd.name))
 
                 # 3, writing encrypted data
                 fd.seek(0, 0)  # sets file pos to start
 
-                if self.data_codes[count] == str(self.text_code):  # text file, no need to reed in chunks
-                    chunk = bytes(self.encrypt_str(fd.read().decode(self.text_encoding), enc_key),
-                                  encoding=self.text_encoding)  # main_cli text encryption logic
+                for chunk in yield_byte(fd, size=self.org_chunk_size, mutable=False):
+                    enc_chunk = self.encrypt_bytes(chunk, enc_key)
+                    b__f.write(enc_chunk)
 
-                    b__f.write(chunk)
-                    b__f.write(self.file_data_base)
-                    self.r_batch_size += get_filesize(fd)
-                    on_prog_call('data', _name, round((self.r_batch_size / self.o_batch_cal_size) * 100, 2))
-                else:
-                    for chunk in yield_byte(fd, size=self.chunk_size):
-                        chunk.reverse()  # main_cli bytes encryption logic
-                        b__f.write(chunk)
-                        self.r_batch_size += self.chunk_size
-                        on_prog_call('data', _name, round((self.r_batch_size / self.o_batch_cal_size) * 100, 2))
-                    b__f.write(self.file_data_base)
+                    self.read_batch_size += len(chunk)
+                    on_prog_call('data', _name,  min(round((self.read_batch_size / self.o_batch_size) * 100, 2), 100))
 
-                if count != __no - 1:
-                    cal_size = get_new_pos(b__f.tell(), self.chunk_size, start=__start_pos)  # calibrating file size
-                    b__f.seek(cal_size, 0)
-                    self.pointers.append(str(cal_size))
+                # b__f.write(fileDataBase)
+
+                # if self.data_codes[count] == str(self.text_code):  # text file, no need to reed in chunks
+                #     chunk = bytes(self.encrypt_str(fd.read().decode(self.text_encoding), enc_key),
+                #                   encoding=self.text_encoding)  # main_cli text encryption logic
+                #
+                #     b__f.write(chunk)
+                #     b__f.write(self.file_data_base)
+                #     self.r_batch_size += get_filesize(fd)
+                #     on_prog_call('data', _name, round((self.r_batch_size / self.o_batch_cal_size) * 100, 2))
+                # else:
+                #     for chunk in yield_byte(fd, size=self.chunk_size):
+                #         chunk.reverse()  # main_cli bytes encryption logic
+                #         b__f.write(chunk)
+                #         self.r_batch_size += self.chunk_size
+                #         on_prog_call('data', _name, round((self.r_batch_size / self.o_batch_cal_size) * 100, 2))
+                #     b__f.write(self.file_data_base)
+
+                # if count != __no - 1:
+                #     cal_size = get_new_pos(b__f.tell(), self.enc_chunk_size, start=_start_pos)  # calibrating file size
+                #     b__f.seek(cal_size, 0)
+                #     self.pointers.append(cal_size)
 
             # 5. writing pointers at beginning of file
             on_prog_call('pointers', self.b_f_path, 100)
             b__f.seek(0, 0)
 
             # saving pointers and decryption codes
-            _dec_code_str = self.dec_code_base + self.dec_code_base.join(('0', '0', str(round(time.time())))) + self.dec_code_base
-            _pointer_s = self.pointer_base + f"{self.pointer_base}".join(self.pointers) + self.pointer_base
+            _dec_code_str = self.dec_code_base + self.dec_code_base.join(
+                ('0', '0', str(round(time.time())))) + self.dec_code_base
+            _pointer_s = self.pointer_base + f"{self.pointer_base}".join(map(str, self.pointers)) + self.pointer_base
             b__f.write(bytes(_pointer_s + self.pointer_dec_code_sep + _dec_code_str, encoding=self.meta_encoding))
 
         read_only(self.b_f_path)  # need to be cleared before decryption
 
 
 class DecBatch(Decryptor):
-    def __init__(self, text_encoding=TextEncoding, chunk_size=ChunkSize, meta_base=MetaBase, meta_encoding=MetaEncoding,
-                 pointer_base=PointerBase, pointer_size=PointerSize, name_base=NameBase, data_code_base=DataTypeBase,
-                 file_data_base=FileDataBase, dec_code_base=DecCodeBase, pointer_dec_separator=PointerDecSeparator):
-        Decryptor.__init__(self, text_base=TextBase)
+    def __init__(self, org_unit_bytes=ORG_UNIT_BYTES, enc_unit_bytes=ENC_UNIT_BYTES, chunk_units=CHUNK_UNITS,
+                 text_encoding=TextEncoding,
+                 meta_base=MetaBase, meta_encoding=MetaEncoding, pointer_base=PointerBase, pointer_size=PointerSize,
+                 name_base=NameBase, data_code_base=DataTypeBase, dec_code_base=DecCodeBase, pointer_dec_separator=PointerDecSeparator):
+        Decryptor.__init__(self, org_unit_bytes=org_unit_bytes, enc_unit_bytes=enc_unit_bytes, text_base=TextBase)
 
-        self.chunk_size = chunk_size  # specific
         self.text_encoding = text_encoding
 
         # meta attrs
@@ -501,7 +641,7 @@ class DecBatch(Decryptor):
 
         # pointer attrs
         self.pointer_base = pointer_base
-        self.pointer_size = pointer_size      # specific, includes pointers and decryption codes in form \p1\p2\p3\%%<<code<<no_of_fails<<timestamp<<
+        self.pointer_size = pointer_size  # specific, includes pointers and decryption codes in form \p1\p2\p3\%%<<code<<no_of_fails<<timestamp<<
         self.dec_data_pos = 0  # position at which decryption data starts
 
         # dec code constants, decryption code is in form <<code<<no_of_fails<<timestamp<<
@@ -511,7 +651,7 @@ class DecBatch(Decryptor):
 
         self.name_base = name_base  # specific
         self.data_code_base = data_code_base  # specific
-        self.file_data_base = file_data_base  # specific
+        # self.file_data_base = file_data_base  # specific
 
         self.meta_str = ''
         self.names = []  # file names in batch, clear after every task
@@ -543,9 +683,9 @@ class DecBatch(Decryptor):
         ms_array = self.meta_str.split(self.meta_base)[1:-1]
 
         # main_cli info
-        self.set_primes(int(ms_array[0]), int(ms_array[1]))
-        self.work_enc_key = self.enc_keys[self.decrypt_int(int(ms_array[2]), self._dec_key)]
-        self.work_dec_key = self.get_dec_keys(self.work_enc_key, 2)[0]
+        self.init(int(ms_array[0]), int(ms_array[1]))
+        self.work_enc_key = self.enc_keys[self.decrypt_int(int(ms_array[2]), self.primary_dec_key)]
+        self.work_dec_key = self.get_dec_keys(self.work_enc_key, 1)[0]
 
         # user pass word
         self.user_pass = self.decrypt_str(self.decrypt_str(ms_array[3], self.work_dec_key), self.work_dec_key)
@@ -564,67 +704,114 @@ class DecBatch(Decryptor):
         sets meta info and pointers, also sets file position to first pointer
         """
         self.clear_cache()
-        self.total_batch_size = get_filesize(e_b_des)
+        self.total_batch_size = get_file_size(e_b_des)
         e_b_des.seek(0, 0)
 
-        __pointer_dec_str = e_b_des.read(self.pointer_size).decode(self.meta_encoding)
-        __pointer_s, __dec_s = __pointer_dec_str.split(self.pointer_dec_code_sep)
-        self.dec_data_pos = sys.getsizeof(bytes(__pointer_s + self.pointer_dec_code_sep, encoding=self.meta_encoding)) - self.void_byte_size
+        _header_bytes = e_b_des.read(self.pointer_size)
+        _header_str = _header_bytes.decode(self.meta_encoding)
+        _pointer_str, _dec_data_str = _header_str.split(self.pointer_dec_code_sep)
 
-        self.dec_data = list(map(int, __dec_s.split(self.dec_code_base)[1:-1]))     # since dec_code base is also at start and end
-        self.pointers = list(map(int, __pointer_s.split(self.pointer_base)[1:-1]))  # since pointer base is also at start and end
+        sep_encoded = self.pointer_dec_code_sep.encode(self.meta_encoding)
+        self.dec_data_pos = _header_bytes.index(sep_encoded) + len(sep_encoded)
+
+        self.dec_data = list(map(int, _dec_data_str.split(self.dec_code_base)[1:-1]))  # since dec_code base is also at start and end
+        self.pointers = list(map(int, _pointer_str.split(self.pointer_base)[1:-1]))  # since pointer base is also at start and end
         on_prog_call('pointer', e_b_des.name, round((self.pointer_size / self.total_batch_size) * 100, 2))
         self._next_pointers = self.pointers[1:]  # excluding 1st pointer
-        self._next_pointers.append(get_new_pos(self.total_batch_size, chunk_size=self.chunk_size, start=self.pointers[-1]))  # for last pointer
+        self._next_pointers.append(self.total_batch_size)  # for the last pointer
+        # self._next_pointers.append(get_new_pos(self.total_batch_size, chunk_size=self.enc_chunk_size, start=self.pointers[-1]))  # for last pointer
 
         self.set_meta_info(e_b_des.read(self.pointers[0] - self.pointer_size))
         on_prog_call('meta', e_b_des.name, round((self.pointers[0] / self.total_batch_size) * 100, 2))
         self.read_batch_size = self.pointers[0]
 
     def get_dec_data_bytes(self, dec_data=(0, 0, 0)):
-        return bytes(self.dec_code_base + self.dec_code_base.join(str(round(_i)) for _i in dec_data) + self.dec_code_base, encoding=self.meta_encoding)
+        return bytes(
+            self.dec_code_base + self.dec_code_base.join(str(round(_i)) for _i in dec_data) + self.dec_code_base,
+            encoding=self.meta_encoding)
+
+    def set_dec_data(self, e_f_des, dec_data, commit: bool = True):
+        self.dec_data = dec_data
+
+        if commit:
+            __prev_pos = e_f_des.tell()
+            e_f_des.seek(self.dec_data_pos, 0)
+            e_f_des.write(self.get_dec_data_bytes(dec_data))
+            e_f_des.seek(__prev_pos, 0)
+
+    def update_lock_status(self, e_f_des, fail_count: int, commit: bool = True):
+        fail_count = max(0, fail_count)
+        if fail_count == 0:
+            dec_code = DecNormal
+        elif fail_count < MaxFailTries:
+            dec_code = DecFailed
+        else:
+            dec_code = DecLocked
+
+        regain_secs = round(AccessRegainSecsBase * math.exp(AccessRegainSecsExponent * (fail_count - 1))) if fail_count else 0
+        regain_timestamp = round(time.time() + regain_secs)
+
+        self.set_dec_data(e_f_des, (dec_code, fail_count, regain_timestamp), commit)
+        return dec_code, regain_secs
 
     def decrypt_batch(self, e_b_des, out_dir=None, set_header=False, on_prog_call=lambda *args: print(args)):
         if set_header:
             self.set_header(e_b_des=e_b_des, on_prog_call=on_prog_call)
-        else:
-            # file position should be at first pointer
-            e_b_des.seek(self.pointers[0], 0)
 
         _path = os.path.realpath(e_b_des.name)
         _dir, _fname = os.path.split(_path)
         _name = os.path.splitext(_fname)[0]
         if not out_dir:
-            out_dir = os.path.join(_dir, _name[:10] + '..(Decrypted)')
+            out_dir = os.path.join(_dir, _name[:10] + ' (Decrypted)')
         else:
-            out_dir = os.path.join(out_dir, _name[:10] + '..(Decrypted)')
+            out_dir = os.path.join(out_dir, _name[:10] + ' (Decrypted)')
 
         self.out_dir = get_non_existing_path(out_dir)
         if not os.path.isdir(self.out_dir):
             os.makedirs(self.out_dir)
 
+        e_b_des.seek(self.pointers[0], 0)
+
+        def _handle_enc_chunk(f_name, org_file, chunk_size):
+            enc_chunk = e_b_des.read(chunk_size)
+            dec_chunk = self.decrypt_bytes(enc_chunk, dec_key=self.work_dec_key)
+            org_file.write(dec_chunk)
+
+            self.read_batch_size += len(enc_chunk)
+            on_prog_call('data', f_name, min(round((self.read_batch_size / self.total_batch_size) * 100, 2), 100))
+
         # main_cli data decryption
-        for _name, _d_code, _pointer, _n_pointer in zip(self.names, self.data_codes, self.pointers, self._next_pointers):
+        for _name, _d_code, _pointer, _n_pointer in zip(self.names, self.data_codes, self.pointers,
+                                                        self._next_pointers):
             _f_path = get_non_existing_path(os.path.join(self.out_dir, _name))
             _r_size = _n_pointer - _pointer
+            _r_iters, _r_left = divmod(_r_size, self.enc_chunk_size)
 
             with open(_f_path, 'wb+') as o__f:
-                if _d_code == self.text_code:  # text file
-                    chunk = e_b_des.read(_r_size).split(self.file_data_base)[0]
-                    o__f.write(bytes(self.decrypt_str(chunk.decode(self.text_encoding), self.work_dec_key), encoding=self.text_encoding))
+                if _r_iters:
+                    for _ in range(_r_iters):
+                       _handle_enc_chunk(_name, o__f, self.enc_chunk_size)
 
-                    self.read_batch_size += _r_size
-                    on_prog_call('data', _name, round((self.read_batch_size / self.total_batch_size) * 100, 2))
-                else:
-                    _r_iters = int(_r_size / self.chunk_size)
+                if _r_left:
+                    _handle_enc_chunk(_name, o__f, _r_left)
 
-                    for _iter in range(0, _r_iters):
-                        chunk = bytearray(e_b_des.read(self.chunk_size))
-                        if _iter == _r_iters - 1:  # last iteration
-                            chunk = chunk.split(self.file_data_base)[0]
-                        chunk.reverse()
-                        o__f.write(chunk)
+                # if _d_code == self.text_code:  # text file
+                #     enc_chunk = e_b_des.read(_r_size).split(self.file_data_base)[0]
+                #     o__f.write(bytes(self.decrypt_str(enc_chunk.decode(self.text_encoding), self.work_dec_key), encoding=self.text_encoding))
+                #
+                #     self.read_batch_size += _r_size
+                #     on_prog_call('data', _name, round((self.read_batch_size / self.total_batch_size) * 100, 2))
+                # else:
+                #     _r_iters = int(_r_size / self.chunk_size)
+                #
+                #     for _iter in range(0, _r_iters):
+                #         enc_chunk = bytearray(e_b_des.read(self.chunk_size))
+                #         if _iter == _r_iters - 1:  # last iteration
+                #             enc_chunk = enc_chunk.split(self.file_data_base)[0]
+                #         enc_chunk.reverse()
+                #         o__f.write(enc_chunk)
+                #
+                #         self.read_batch_size += self.chunk_size
+                #         _per = round((self.read_batch_size / self.total_batch_size) * 100, 2)
+                #         on_prog_call('data', _name, _per if _per <= 100.00 else 100.00)
 
-                        self.read_batch_size += self.chunk_size
-                        _per = round((self.read_batch_size / self.total_batch_size) * 100, 2)
-                        on_prog_call('data', _name, _per if _per <= 100.00 else 100.00)

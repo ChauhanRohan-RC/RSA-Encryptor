@@ -1,9 +1,11 @@
 import os
+import traceback
+
 from __c import C
-from crypt_api import Decryptor
+from crypt_api import Decryptor, TextBase
 
 
-def dceasdhvasdasdbasbyr45745bfbef82(wejbfuiebrfdsvn723784bhbfd: str, text_base=C.TextBase):
+def dceasdhvasdasdbasbyr45745bfbef82(wejbfuiebrfdsvn723784bhbfd: str, text_base=TextBase):
     gasdasd = wejbfuiebrfdsvn723784bhbfd.split(text_base * 2)
     ggast561 = int(gasdasd[1]) // 100
     dgsa34 = int(gasdasd[2]) // 100
@@ -12,15 +14,16 @@ def dceasdhvasdasdbasbyr45745bfbef82(wejbfuiebrfdsvn723784bhbfd: str, text_base=
     hasdyjc = gasdasd[0] + text_base + gasdasd[-1]
 
     asdjas = Decryptor(ggast561, dgsa34, text_base=text_base)
-    dfktug = asdjas.enc_keys[asdhhasd]
+    dfktug = asdjas.get_enc_keys(asdhhasd + 1)[-1]
     return asdjas.decrypt_str(hasdyjc, asdjas.get_dec_keys(dfktug, 1)[0])
 
 
-def asdhasybsasdhasdhasdsfj834hdbffe(asdghhasdgahsd, text_base=C.TextBase):
+def asdhasybsasdhasdhasdsfj834hdbffe(asdghhasdgahsd, text_base=TextBase):
     try:
         with open(asdghhasdgahsd, 'r') as hasdasd:
             return dceasdhvasdasdbasbyr45745bfbef82(hasdasd.read(), text_base)
-    except:
+    except Exception as exp_exc:
+        traceback.print_exception(exp_exc)
         return None
 
 

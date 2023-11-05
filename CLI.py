@@ -1,15 +1,38 @@
-import os
-import sys
-import time
+import traceback
+
 from consolecolor import Color, CLITheme
 from tkinter import Tk, filedialog
 from __c import C, format_secs, resources_check
-from crypt_api import EncBatch, DecBatch, clear_read_only
-import jkkguyv523asdasd
+from crypt_api import *
+import pwinput
 
 # cache progress vars
 _file_in_enc_prog = ''
 _file_in_dec_prog = ''
+
+# Encryptor Instance
+_ENC: EncBatch = None
+
+# Decryptor Instance
+_DEC: DecBatch = None
+
+
+def get_encryptor() -> EncBatch:
+    global _ENC
+    if _ENC is None:
+        print(color(f'\n -> Loading Encryptor...', Cs.Header))
+        _ENC = EncBatch()
+
+    return _ENC
+
+
+def get_decryptor() -> DecBatch:
+    global _DEC
+    if _DEC is None:
+        print(color(f'\n -> Loading Decryptor...', Cs.Header))
+        _DEC = DecBatch()
+
+    return _DEC
 
 
 def _quit(cap='\n-->> Exiting CLI..........', code=0):
@@ -18,7 +41,7 @@ def _quit(cap='\n-->> Exiting CLI..........', code=0):
     sys.exit(code)
 
 
-def _pre():  # to ensure all directories and resources exists
+def perform_pre_checks():  # to ensure all directories and resources exists
     resources_check()
 
 
@@ -84,14 +107,11 @@ def _validate_pass(pass_word):
     return _len, _u, _l, _s, _d
 
 
-def get_pass(cap='-->> Choose Password', min_length=6):
-    print(color(
-        f'\n-->> Note : Password must have at least 1 upper, 1 lower , 1 special char and 1 digit, {min_length} chars long )',
-        Cs.Instruction))
-    __in = input(color(f'{cap} : ', Cs.UserInput))
-    _len, _u, _l, _s, _d = _validate_pass(__in)
+def _input_pass_internal(prompt, min_length):
+    while True:
+        cur_pass = pwinput.pwinput(prompt=prompt, mask="*")
+        _len, _u, _l, _s, _d = _validate_pass(cur_pass)
 
-    while not (_len >= min_length and _u and _l and _s and _d):
         if _len < min_length:
             print(color(f'--> Password Strength weak, must be at least {min_length} chars long....', Cs.WeakWarning))
         elif not _u:
@@ -100,52 +120,54 @@ def get_pass(cap='-->> Choose Password', min_length=6):
             print(color(f'--> Password must have at least one lower case char....', Cs.WeakWarning))
         elif not _s:
             print(color(f'--> Password must have at least one special char....', Cs.WeakWarning))
-        else:
+        elif not _d:
             print(color(f'--> Password must have at least one digit....', Cs.WeakWarning))
-
-        __in = input(color(f'{cap} : ', Cs.UserInput))
-        _len, _u, _l, _s, _d = _validate_pass(__in)
-
-    return __in
+        else:
+            return cur_pass
 
 
-def check_pass(c_pass, chances=3, file_name='', cap='\n-->> Enter Password'):
+def get_pass(choose_prompt='-->> Choose Password: ', confirm_prompt='-->> Confirm Password: ', min_length=6,
+             confirm_chances=2):
+    print(color(
+        f'\n-->> Note : Password must be at least {min_length} chars long, with an upper case, lower case, special char and digit)',
+        Cs.Instruction))
+
+    while True:
+        in_pass = _input_pass_internal(prompt=choose_prompt, min_length=min_length)
+
+        for i in range(confirm_chances):
+            conf_pass = pwinput.pwinput(prompt=confirm_prompt, mask="*")
+            if in_pass == conf_pass:
+                break
+            elif i < confirm_chances - 1:
+                print(color("-->> Password did not match! Try again\n", Cs.Warning))
+        else:
+            print(color("\n-->> Password Confirmation Failed! Please retry...\n", Cs.Error))
+            continue
+
+        break
+
+    return in_pass
+
+
+def check_pass(c_pass, chances=3, file_name='', prompt='\n-->> Enter Password: '):
+    __cap = f'{prompt} {"" if not file_name else f"of <<{Cs.FileName} {file_name} {Cs.UserInput}>> "}: '
     while chances:
-        __cap = f'{cap} {"" if not file_name else f"of <<{Cs.FileName} {file_name} {Cs.UserInput}>> "}: '
-        __in = input(color(__cap, Cs.UserInput))
+        __in = pwinput.pwinput(prompt=__cap, mask="*")
         if __in == c_pass:
             return True
         chances -= 1
         if chances:
-            print(color(f'-> Invalid Password, chances left : {Cs.HighLight}{chances}{Cs.Warning}', Cs.Warning))
+            print(color(f'-> Access Unauthorized. Attempts Left : {Cs.HighLight}{chances}{Cs.Warning}', Cs.Warning))
 
     return False
-
-
-def set_black_status(e_f_des, fail_count):
-    _code = C.DecFailed if fail_count < C.MaxFailChances else C.DecLocked
-    _del_time = (C.AccessRegainSecs * fail_count)
-
-    __prev_pos = e_f_des.tell()
-    e_f_des.seek(DEC.dec_data_pos, 0)
-    e_f_des.log(DEC.get_dec_data_bytes((_code, fail_count, time.time() + _del_time)))
-    e_f_des.seek(__prev_pos, 0)
-
-    return _code, _del_time
-
-
-def release_black_status(e_f_des):
-    __prev_pos = e_f_des.tell()
-    e_f_des.seek(DEC.dec_data_pos, 0)
-    e_f_des.log(DEC.get_dec_data_bytes((0, 0, time.time())))
-    e_f_des.seek(__prev_pos, 0)
 
 
 def encrypt_files(path_seq):
     fd_seq = []
     for __p in path_seq:
         if os.path.isfile(__p):
-            if os.path.splitext(__p)[1] == C.EncExt:
+            if os.path.splitext(__p)[1] == EncExt:
                 print(color(
                     f'--> warning : File <<{Cs.FileName} {os.path.basename(__p)} {Cs.Warning}>> already encrypted...',
                     Cs.Warning))
@@ -174,32 +196,34 @@ def encrypt_files(path_seq):
 
             if not __out_name or __out_name.isspace():
                 print(color('--> Warning : No Input File Name', Cs.Warning))
-            elif __out_name == 'b':   # browse
+            elif __out_name == 'b':  # browse
                 out_path = filedialog.asksaveasfilename(initialdir="C;\\", title="Save As",
-                                                        filetypes=(('Rc Encrypted File', f'*{C.EncExt}'),))
+                                                        filetypes=(('Rc Encrypted File', f'*{EncExt}'),))
                 if out_path:
-                    out_path += C.EncExt
+                    out_path += EncExt
                     break
                 else:
                     out_path = None
                     print(color('--> Warning : No Input File Name', Cs.Warning))
                     continue
-            elif __out_name == 'a':               # auto
+            elif __out_name == 'a':  # auto
                 out_path = None
                 break
-            else:                                   # file name specified
-                out_path = os.path.join(os.path.dirname(path_seq[0]), __out_name + C.EncExt)
+            else:  # file name specified
+                out_path = os.path.join(os.path.dirname(path_seq[0]), __out_name + EncExt)
                 break
 
+        encryptor = get_encryptor()
         try:
-            ENC.encrypt_batch(fd_seq=fd_seq, pass_word=__in, b_f_path=out_path, enc_ext=C.EncExt, on_prog_call=enc_prog)
+            encryptor.encrypt_batch(fd_seq=fd_seq, pass_word=__in, b_f_path=out_path, enc_ext=EncExt,
+                                    on_prog_call=enc_prog)
         except Exception as enc_e:
             print(color(
-                f'\n\n-> Exception while encrypting <<{Cs.FileName} {os.path.basename(ENC.b_f_path)} {Cs.Error}>> : {Cs.HighLight}{enc_e}{Cs.Error}',
+                f'\n\n-> Exception while encrypting <<{Cs.FileName} {os.path.basename(encryptor.b_f_path)} {Cs.Error}>> : {Cs.HighLight}{enc_e}{Cs.Error}',
                 Cs.Error))
         else:
             print(color(
-                f'\n\n_--> Input Files Encrypted Successfully, Output File :  {Cs.FileName} {os.path.basename(ENC.b_f_path)}{Cs.Success}',
+                f'\n\n_--> Input Files Encrypted Successfully, Output File :  {Cs.FileName} {os.path.basename(encryptor.b_f_path)}{Cs.Success}',
                 Cs.Success))
         finally:
             for fd in fd_seq:
@@ -209,84 +233,97 @@ def encrypt_files(path_seq):
 
 
 def _main_decryption(e_f_des):
+    print(color('-->> Access Granted!', Cs.Success))
     __out_dir = filedialog.askdirectory(initialdir="C;\\", title="Choose a directory to save decrypted files")
     if not __out_dir:
         __out_dir = None
     try:
-        DEC.decrypt_batch(e_b_des=e_f_des, out_dir=__out_dir, set_header=False, on_prog_call=dec_prog)
+        get_decryptor().decrypt_batch(e_b_des=e_f_des, out_dir=__out_dir, set_header=False, on_prog_call=dec_prog)
     except Exception as dec_e:
+        traceback.print_exc()
+        traceback.print_exception(dec_e)
         print(color(
             f'\n\n-> Exception : While Decrypting <<{Cs.FileName} {os.path.basename(os.path.realpath(e_f_des.name))} {Cs.Error}>> : {Cs.HighLight}{dec_e}{Cs.Error}',
             Cs.Error))
     else:
         print(color(
-            f'\n\n--> File <<{Cs.FileName} {os.path.basename(os.path.realpath(e_f_des.name))} {Cs.Success}>> decrypted Successfully, Output Directory : <<{Cs.FileName} {DEC.out_dir} {Cs.Success}>>',
+            f'\n\n--> File <<{Cs.FileName} {os.path.basename(os.path.realpath(e_f_des.name))} {Cs.Success}>> decrypted Successfully, Output Directory : <<{Cs.FileName} {get_decryptor().out_dir} {Cs.Success}>>',
             Cs.Success))
 
 
-def decrypt_file(e_f_path, chances=C.DecChances):
-    if os.path.isfile(e_f_path):
-        if os.path.splitext(e_f_path)[1] == C.EncExt:
-            clear_read_only(e_f_path)
-            try:
-                with open(e_f_path, 'rb+') as e__f:
-                    DEC.set_header(e__f, on_prog_call=dec_prog)
-
-                    # checking blacklist status
-                    _black_code, _fail_count, _reset_time, = DEC.dec_data
-                    if _black_code == C.DecFailed:
-                        _del_time = _reset_time - round(time.time())
-                        if _del_time > 0:
-                            print(color(
-                                f'\n -->> Error : Access Unauthorized, Try again after {Cs.HighLight}<< {format_secs(_del_time, out="str")} >>{Cs.Error}',
-                                Cs.Error))
-                            return False
-
-                    if _black_code in (C.DecNormal, C.DecFailed):
-                        if check_pass(c_pass=DEC.user_pass, chances=chances, file_name=os.path.basename(e_f_path)):
-                            if _black_code == C.DecFailed:
-                                release_black_status(e__f)
-                            _main_decryption(e__f)
-                        else:
-                            _code, _del_time = set_black_status(e__f, _fail_count + 1)
-                            if _code == C.DecFailed:
-                                print(color(
-                                    f'\n--> Access Unauthorized : {Cs.HighLight}Fail Attempts : {(_fail_count + 1) * C.DecChances}{Cs.Error}, Try Again After {Cs.HighLight}<< {format_secs(_del_time, out="str")} >>{Cs.Error}....'),
-                                      Cs.Error)
-                            elif _code == C.DecLocked:
-                                print(color(
-                                    f'\n\n-->> Fatal User Error : Attempts Limit Reached, File Locked and can only be decrypted by {Cs.HighLight}<< Expert Decryption Key >>{Cs.Error}',
-                                    Cs.Error))
-
-                    elif _black_code == C.DecLocked:
-                        # if file is locked
-                        print(color(
-                            f'\n\n ....................   File <<{Cs.FileName} {os.path.basename(e_f_path)} {Cs.Warning}>> is LOCKED  ...................'),
-                              Cs.Warning)
-                        if jkkguyv523asdasd.dfhds72346nh3434hsd34gsdf23h:
-                            __in = input(color(
-                                f'\n\n-->> Enter Expert Decryption Key to Unlock <<{Cs.FileName} {os.path.basename(e_f_path)} {Cs.UserInput}>> : ',
-                                Cs.UserInput))
-                            if __in == jkkguyv523asdasd.dfhds72346nh3434hsd34gsdf23h:
-                                release_black_status(e__f)
-                                _main_decryption(e__f)
-                            else:
-                                print(color('\n-->> Error : Invalid Expert Decryption Key', Cs.Error))
-                        else:
-                            print(color('\n-->> Fatal Error : Failed to verify Expert Decryption Key from server!!', Cs.Error))
-
-            except Exception as _enc_file_e:
-                print(color(
-                    f'\n-> Exception :  while Decrypting <<{Cs.FileName} {os.path.basename(e_f_path)} {Cs.Error}>> : {Cs.HighLight}{_enc_file_e}{Cs.Error}',
-                    Cs.Error))
-        else:
-            print(color(
-                f'\n--> Error : Input file <<{Cs.FileName} {os.path.basename(e_f_path)} {Cs.Error}>> is not Encrypted',
-                Cs.Error))
-    else:
+def decrypt_file(e_f_path, chances=DecChancesPerTry):
+    if not os.path.isfile(e_f_path):
         print(
             color(f'\n--> Error : Input file <<{Cs.FileName} {os.path.basename(e_f_path)} {Cs.Error}>> does not exists',
                   Cs.Error))
+        return False
+
+    if not os.path.splitext(e_f_path)[1] == EncExt:
+        print(color(
+            f'\n--> Error : Input file <<{Cs.FileName} {os.path.basename(e_f_path)} {Cs.Error}>> is not Encrypted',
+            Cs.Error))
+        return False
+
+    clear_read_only(e_f_path)
+    decryptor = get_decryptor()
+
+    try:
+        with open(e_f_path, 'rb+') as e_f_des:
+            decryptor.set_header(e_f_des, on_prog_call=dec_prog)
+
+            # checking blacklist status
+            dec_code, fail_count, regain_timestamp, = decryptor.dec_data
+            if dec_code == DecFailed:
+                regain_secs = regain_timestamp - round(time.time())
+                if regain_secs > 0:
+                    print(color(
+                        f'\n -->> Error : Access Unauthorized, Try again after {Cs.HighLight}<< {format_secs(regain_secs, out="str")} >>{Cs.Error}',
+                        Cs.Error))
+                    return False
+
+            if dec_code in (DecNormal, DecFailed):
+                if check_pass(c_pass=get_decryptor().user_pass, chances=chances,
+                              file_name=os.path.basename(e_f_path)):
+                    if dec_code != DecNormal:
+                        decryptor.update_lock_status(e_f_des, 0, commit=True)
+                    _main_decryption(e_f_des)
+                else:
+                    dec_code, regain_secs = decryptor.update_lock_status(e_f_des, fail_count + 1, commit=True)
+                    if dec_code == DecFailed:
+                        print(color(
+                            f'\n--> Access Unauthorized : {Cs.HighLight}Fail Attempts : {(fail_count + 1) * DecChancesPerTry}{Cs.Error}, Try Again After {Cs.HighLight}<< {format_secs(regain_secs, out="str")} >>{Cs.Error}....'),
+                            Cs.Error)
+                    elif dec_code == DecLocked:
+                        print(color(
+                            f'\n\n-->> Authorization Frozen : Attempts Limit Reached, File is now locked and can only be decrypted by {Cs.HighLight}<< Expert Decryption Key >>{Cs.Error}',
+                            Cs.Error))
+
+            elif dec_code == DecLocked:
+                # if file is locked
+                print(color(
+                    f'\n\n ....................   File <<{Cs.FileName} {os.path.basename(e_f_path)} {Cs.Warning}>> is LOCKED  ...................', Cs.Warning))
+                print(color('-> Connecting to server for expert decryption verification...', Cs.ProgressHead))
+
+                import jkkguyv523asdasd
+                if jkkguyv523asdasd.dfhds72346nh3434hsd34gsdf23h:
+                    __in = pwinput.pwinput(
+                        f'\n\n-->> Enter Expert Decryption Key to Unlock <<{Cs.FileName} {os.path.basename(e_f_path)} {Cs.UserInput}>> : ',
+                        "*")
+                    if __in == jkkguyv523asdasd.dfhds72346nh3434hsd34gsdf23h:
+                        decryptor.update_lock_status(e_f_des, 0, commit=True)
+                        _main_decryption(e_f_des)
+                    else:
+                        print(color('\n-->> Error : Invalid Expert Decryption Key', Cs.Error))
+                else:
+                    print(color('\n-->> Fatal Error : Failed to verify Expert Decryption Key from server!!',
+                                Cs.Error))
+
+    except Exception as _enc_file_e:
+        print(color(
+            f'\n-> Exception : while Decrypting <<{Cs.FileName} {os.path.basename(e_f_path)} {Cs.Error}>> : {Cs.HighLight}{_enc_file_e}{Cs.Error}',
+            Cs.Error))
+    finally:
+        read_only(e_f_path)
 
 
 def main_cli(task=''):
@@ -308,7 +345,7 @@ def main_cli(task=''):
 
     elif task == 'd':
         f_path = filedialog.askopenfilename(initialdir="C;\\", title="Choose Encrypted File to Decrypt",
-                                            filetypes=(('Rc Encrypted File', f'*{C.EncExt}'),))
+                                            filetypes=(('Rc Encrypted File', f'*{EncExt}'),))
         if f_path:
             decrypt_file(f_path)
         else:
@@ -340,22 +377,10 @@ def main_arg(args):
         main_cli()
 
 
-_pre()  # ensure all resources
+# ensure all resources
+perform_pre_checks()
 
 # ..............................      Class Instances       .................................
-
-# Encryptor Instance
-ENC = EncBatch(text_encoding=C.TextEncoding, chunk_size=C.ChunkSize, meta_base=C.MetaBase, meta_encoding=C.MetaEncoding,
-               pointer_base=C.PointerBase, pointer_size=C.PointerSize, name_base=C.NameBase,
-               data_code_base=C.DataTypeBase, file_data_base=C.FileDataBase, dec_code_base=C.DecCodeBase,
-               pointer_dec_separator=C.PointerDecSeparator)
-
-# Decryptor Instance
-DEC = DecBatch(text_encoding=C.TextEncoding, chunk_size=C.ChunkSize, meta_base=C.MetaBase, meta_encoding=C.MetaEncoding,
-               pointer_base=C.PointerBase, pointer_size=C.PointerSize, name_base=C.NameBase,
-               data_code_base=C.DataTypeBase, file_data_base=C.FileDataBase, dec_code_base=C.DecCodeBase,
-               pointer_dec_separator=C.PointerDecSeparator)
-
 color = Color()  # Terminal Color Instance
 color.enable_color()  # initialising color
 

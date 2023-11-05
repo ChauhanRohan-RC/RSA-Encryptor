@@ -74,7 +74,7 @@ class Logger:
 
 
 class C:
-    Version = "6.0.0"
+    Version = "8.0.0"
     EncExt = ".rce"
 
     ExeName = "Rcrypt"
@@ -100,45 +100,45 @@ class C:
     ExtAssociationName = ExeName.upper() + EncExt   # IN WINDOWS REGISTRY
     ContextMenuTitle = 'Decrypt'
 
-    # Encryption Constants
-    MinLimit = 12
-    MaxLimit = 40
-
-    # Decryption Constants
-    DecNormal = 0
-    DecFailed = 1
-    DecLocked = 2
-    DecChances = 3
-    AccessRegainTime = 2  # minutes to able to retry the decryption
-    AccessRegainSecs = round(AccessRegainTime * 60)
-    MaxFailChances = 3  # after which it get locked and can only be decrypted by expert dec key
-
-    # Encodings
-    MetaEncoding = 'utf-8'
-    TextEncoding = 'utf-8'
-    TextCode = 2
-    ByteCode = 3
-
-    # Sizes (in Bytes) ......................................................
-    ChunkSize = 4096
-    PointerSize = 40960
-    VoidByteArraySize = 29
-    VoidByteSize = 17
-
-    # ..............................   Separators   .....................
-    TextBase = ':'
-
-    # In Meta Data
-    MetaBase = '||'
-    NameBase = '#'
-    DataTypeBase = '#'
-
-    # In Pointer and Decryption Data
-    PointerBase = '/'
-    DecCodeBase = '<<'
-    PointerDecSeparator = '%%'
-
-    FileDataBase = bytes('__{{||}}__', encoding=TextEncoding)
+    # # Encryption Constants
+    # MinLimit = 12
+    # MaxLimit = 40
+    #
+    # # Decryption Constants
+    # DecNormal = 0
+    # DecFailed = 1
+    # DecLocked = 2
+    # DecChances = 3
+    # AccessRegainTime = 2  # minutes to able to retry the decryption
+    # AccessRegainSecs = round(AccessRegainTime * 60)
+    # MaxFailChances = 3  # after which it get locked and can only be decrypted by expert dec key
+    #
+    # # Encodings
+    # MetaEncoding = 'utf-8'
+    # TextEncoding = 'utf-8'
+    # TextCode = 2
+    # ByteCode = 3
+    #
+    # # Sizes (in Bytes) ......................................................
+    # ChunkSize = 4096
+    # PointerSize = 40960
+    # VoidByteArraySize = 29
+    # VoidByteSize = 17
+    #
+    # # ..............................   Separators   .....................
+    # TextBase = ':'
+    #
+    # # In Meta Data
+    # MetaBase = '||'
+    # NameBase = '#'
+    # DataTypeBase = '#'
+    #
+    # # In Pointer and Decryption Data
+    # PointerBase = '/'
+    # DecCodeBase = '<<'
+    # PointerDecSeparator = '%%'
+    #
+    # FileDataBase = bytes('__{{||}}__', encoding=TextEncoding)
     # ....................................................................
     PassMinChars = 6
     PassGoodChars = 8
