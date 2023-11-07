@@ -1,3 +1,3 @@
-import sys
-a = 1912
-print(a.to_bytes(1, "big"))
+# from crypt_api import *
+
+print(list(enumerate(['12',2,3])))

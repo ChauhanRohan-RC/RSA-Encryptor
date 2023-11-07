@@ -218,6 +218,8 @@ def encrypt_files(path_seq):
             encryptor.encrypt_batch(fd_seq=fd_seq, pass_word=__in, b_f_path=out_path, enc_ext=EncExt,
                                     on_prog_call=enc_prog)
         except Exception as enc_e:
+            traceback.print_exc()
+            traceback.print_exception(enc_e)
             print(color(
                 f'\n\n-> Exception while encrypting <<{Cs.FileName} {os.path.basename(encryptor.b_f_path)} {Cs.Error}>> : {Cs.HighLight}{enc_e}{Cs.Error}',
                 Cs.Error))
@@ -240,7 +242,6 @@ def _main_decryption(e_f_des):
     try:
         get_decryptor().decrypt_batch(e_b_des=e_f_des, out_dir=__out_dir, set_header=False, on_prog_call=dec_prog)
     except Exception as dec_e:
-        traceback.print_exc()
         traceback.print_exception(dec_e)
         print(color(
             f'\n\n-> Exception : While Decrypting <<{Cs.FileName} {os.path.basename(os.path.realpath(e_f_des.name))} {Cs.Error}>> : {Cs.HighLight}{dec_e}{Cs.Error}',
@@ -319,6 +320,7 @@ def decrypt_file(e_f_path, chances=DecChancesPerTry):
                                 Cs.Error))
 
     except Exception as _enc_file_e:
+        traceback.print_exception(_enc_file_e)
         print(color(
             f'\n-> Exception : while Decrypting <<{Cs.FileName} {os.path.basename(e_f_path)} {Cs.Error}>> : {Cs.HighLight}{_enc_file_e}{Cs.Error}',
             Cs.Error))

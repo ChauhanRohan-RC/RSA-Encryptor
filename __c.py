@@ -74,7 +74,7 @@ class Logger:
 
 
 class C:
-    Version = "8.0.0"
+    Version = "8.2.0"
     EncExt = ".rce"
 
     ExeName = "Rcrypt"

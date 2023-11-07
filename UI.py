@@ -513,7 +513,7 @@ class EncUi(Frame):
 
         self.enc = EncBatch(text_encoding=C.TextEncoding, chunk_size=C.ChunkSize, meta_base=C.MetaBase, meta_encoding=C.MetaEncoding,
                             pointer_base=C.PointerBase, pointer_size=C.PointerSize, name_base=C.NameBase, data_code_base=C.DataTypeBase,
-                            file_data_base=C.FileDataBase, dec_code_base=C.DecCodeBase, pointer_dec_separator=C.PointerDecSeparator)
+                            file_data_base=C.FileDataBase, dec_status_base=C.DecCodeBase, pointer_dec_separator=C.PointerDecSeparator)
         self.pause = False
 
         self.file_in_frame = EncFileIn(self, main_tk=self.master, next_call=self.next_file_in,
@@ -548,7 +548,7 @@ class EncUi(Frame):
             __f_sizes.append(_f_size)
             self.enc.names.append(os.path.basename(_path))
             self.enc.data_codes.append(str(_data_code))
-            self.enc.o_batch_size += _f_size
+            self.enc.org_batch_size += _f_size
             self.enc.total_batch_cal_size += _f_size if _data_code == self.enc.text_code else get_new_pos(_f_size,
                                                                                                           self.enc.chunk_size,
                                                                                                           0)
@@ -564,7 +564,7 @@ class EncUi(Frame):
             encoding=self.enc.meta_encoding)
 
         meta_b_size = sys.getsizeof(meta_bytes) - self.enc.void_byte_size
-        self.enc.pointers.append(str(self.enc.pointer_size + meta_b_size))  # first pointer
+        self.enc.file_pointers.append(str(self.enc.pointer_size + meta_b_size))  # first pointer
 
         # 4. encrypting data
         try:
@@ -614,17 +614,17 @@ class EncUi(Frame):
                             cal_size = get_new_pos(b__f.tell(), self.enc.chunk_size,
                                                    start=__start_pos)  # calibrating file size
                             b__f.seek(cal_size, 0)
-                            self.enc.pointers.append(str(cal_size))
+                            self.enc.file_pointers.append(str(cal_size))
 
                 if not self.pause:
                     # 5. writing pointers at beginning of file
                     b__f.seek(0, 0)
 
                     # saving pointers and decryption codes
-                    _dec_code_str = self.enc.dec_code_base + self.enc.dec_code_base.join(
-                        ('0', '0', str(round(time.time())))) + self.enc.dec_code_base
+                    _dec_code_str = self.enc.dec_status_base + self.enc.dec_status_base.join(
+                        ('0', '0', str(round(time.time())))) + self.enc.dec_status_base
                     _pointer_s = self.enc.pointer_base + f"{self.enc.pointer_base}".join(
-                        self.enc.pointers) + self.enc.pointer_base
+                        self.enc.file_pointers) + self.enc.pointer_base
 
                     b__f.write(bytes(_pointer_s + self.enc.pointer_dec_code_sep + _dec_code_str,
                                      encoding=self.enc.meta_encoding))
@@ -795,7 +795,7 @@ class DecUI(Frame):
         self.master = master
         self.dec = DecBatch(text_encoding=C.TextEncoding, chunk_size=C.ChunkSize, meta_base=C.MetaBase, meta_encoding=C.MetaEncoding,
                             pointer_base=C.PointerBase, pointer_size=C.PointerSize, name_base=C.NameBase, data_code_base=C.DataTypeBase,
-                            file_data_base=C.FileDataBase, dec_code_base=C.DecCodeBase, pointer_dec_separator=C.PointerDecSeparator)
+                            file_data_base=C.FileDataBase, dec_status_base=C.DecCodeBase, pointer_dec_separator=C.PointerDecSeparator)
         self.file_path = ''
         self.pause = False
 
@@ -943,10 +943,10 @@ class DecUI(Frame):
                 os.makedirs(out_dir)
 
             with open(self.file_path, 'rb+') as e__f:
-                e__f.seek(self.dec.pointers[0], 0)
-                self.dec.read_batch_size = self.dec.pointers[0]
+                e__f.seek(self.dec.file_pointers[0], 0)
+                self.dec.read_batch_size = self.dec.file_pointers[0]
 
-                for _name, _d_code, _pointer, _n_pointer in zip(self.dec.names, self.dec.data_codes, self.dec.pointers,
+                for _name, _d_code, _pointer, _n_pointer in zip(self.dec.org_file_names, self.dec.data_codes, self.dec.file_pointers,
                                                                 self.dec._next_pointers):
                     if self.pause:
                         break
