@@ -1,19 +1,16 @@
-
+import os.path
 # .....................................         IMPORTS       ......................................
 # Widgets
+import time
+from threading import Thread
 from tkinter import filedialog, messagebox, Frame, LabelFrame, Tk, Listbox, Canvas, Entry, Label, StringVar, PhotoImage
-from tkwidgets import FrameAnimator, HScrollScale, VScrollScale, HoverB, HProgressBar
-
-# Main Encryptor and Decryptor api
-from crypt_api import DecBatch, EncBatch, is_writable, is_path_textfile, \
-    get_non_existing_path, get_new_pos, yield_byte, read_only, clear_read_only
 
 # Constants and resources
 from __c import *
-from threading import Thread
-import time
-import secrets
-import jkkguyv523asdasd
+
+# Main Encryptor and Decryptor api
+from crypt_api import *
+from tkwidgets import FrameAnimator, HScrollScale, VScrollScale, HoverB, HProgressBar
 
 # .............................      Constants     .........................
 bg = rgb(10, 10, 10)
@@ -23,7 +20,7 @@ afg = rgb(32, 218, 255)
 
 # Normal Buttons
 b_font = ('product sans', 10)
-b_relief = 'flat'
+b_relief = "flat"
 b_bd = 0
 b_bg = bg
 b_fg = fg
@@ -34,22 +31,22 @@ b_hoverfg = afg
 
 # Menu Buttons
 menu_b_font = ("aquire", 13)
-menu_b_relief = 'flat'
+menu_b_relief = "flat"
 menu_b_bd = 0
 
 # Title Labels
 tl_font = ("product sans", 14)
-tl_relief = 'flat'
+tl_relief = "flat"
 tl_bd = 0
 
 # small Labels
 l_font = ("product sans", 10)
-l_relief = 'flat'
+l_relief = "flat"
 l_bd = 0
 
 # notice Labels
 nl_font = ("product sans", 9)
-nl_relief = 'flat'
+nl_relief = "flat"
 nl_bd = 0
 
 # Entry
@@ -208,8 +205,7 @@ class EncUserIn(Frame):
         self.next_call, self.back_call = next_call, back_call
 
         self.user_pass = StringVar(self.main_tk, '')  # User Input PassWord
-        self.out_path = StringVar(self.main_tk,
-                                  os.path.join(os.getenv('UserProfile'), f'Untitled{self.enc_ext}'))  # Output File path
+        self.out_path = StringVar(self.main_tk, generate_enc_batch_file_path(None, non_existing=True))  # Output File path
 
         kwargs['bg'] = bg
         Frame.__init__(self, self.master, **kwargs)
@@ -295,7 +291,7 @@ class EncUserIn(Frame):
         self.pass_e.delete(0, 'end')
         self.conf_e.delete(0, 'end')
         self.next_b['state'] = 'disabled'
-        self.out_path.set(os.path.join(os.getenv('UserProfile'), f'Untitled{self.enc_ext}'))
+        self.out_path.set(generate_enc_batch_file_path(None, non_existing=True))
         self.pass_check_l.configure(text='Password Strength : Weak', fg='#FF7171')
 
         self.remove_loop_func()
@@ -368,13 +364,14 @@ class EncUserIn(Frame):
             self.next_b['state'] = 'disabled'
 
     def info_check(self):
-        __pass = self.user_pass.get()
-        if __pass:
-            _len, _u, _l, _s, _d = self._validate_pass(__pass)
+        _pass = self.user_pass.get()
+        if _pass:
+            _len, _u, _l, _s, _d = self._validate_pass(_pass)
             if _len < C.PassMinChars:
                 self.pass_check_l.configure(fg='#FF7171', text='Password Strength : Weak')
                 self._disable_next()
                 return
+
             if not _u:
                 self.pass_check_l.configure(fg='#FF7171', text='Must have a Upper Case Char')
                 self._disable_next()
@@ -398,7 +395,7 @@ class EncUserIn(Frame):
                 self.pass_check_l.configure(fg='skyblue', text='Password Strength : Strong')
 
             __confirm = self.conf_e.get()
-            if __confirm == __pass:
+            if __confirm == _pass:
                 self.conf_e['fg'] = '#5CFF74'
             else:
                 self.conf_e['fg'] = '#FF7171'
@@ -412,7 +409,7 @@ class EncUserIn(Frame):
                 return
 
             if os.path.splitext(__out_path)[1] != self.enc_ext:
-                self.pass_check_l.configure(fg='#FF7171', text='Invalid Output Path')
+                self.pass_check_l.configure(fg='#FF7171', text='Invalid Output File Type')
                 self._disable_next()
                 return
 
@@ -422,7 +419,7 @@ class EncUserIn(Frame):
                 self._disable_next()
                 return
 
-            if not is_writable(_dir):
+            if not is_dir_writable(_dir):
                 self.pass_check_l.configure(fg='#FF7171', text='Output Dir does not have write access')
                 self._disable_next()
                 return
@@ -484,22 +481,46 @@ class ProgressFrame(Frame):
         self.main_tk.set_quit_call(self._cancel_call)
         self.main_tk.bind('<Escape>', self._cancel_call)
 
-    def set(self, what, f_name, per):
+    def on_progress(self, what, f_name, percentage):
+        msg_short = None
+        msg_long = None
+
         if self.task == 'enc':
-            if what == 'meta':
-                self.main_l['text'] = f'Packing Meta in {format_path(f_name, self.chars_in_fname)}',
+            if what == 'path':
+                msg_short = 'Creating Encrypted File...'
+                msg_long = f'Creating a new encrypted file: {f_name}',
+            elif what == 'meta':
+                msg_short = 'Encrypting Meta Data...'
+                msg_long = f'Encrypting Meta Data in {format_path(f_name, self.chars_in_fname)}',
             elif what == 'pointer':
-                self.main_l['text'] = f'Packing Pointers in {format_path(f_name, self.chars_in_fname)}'
+                msg_short = 'Encrypting Pointers...'
+                msg_long = f'Encrypting Pointers in {format_path(f_name, self.chars_in_fname)}'
+            elif what == 'dec_status':
+                msg_short = 'Validating Integrity...'
+                msg_long = f'Validating Encryption Integrity in {format_path(f_name, self.chars_in_fname)}'
             elif what == 'data':
-                self.main_l['text'] = f'Encrypting {format_path(f_name, self.chars_in_fname)}'
+                msg_short = f'Encrypting {format_path(os.path.basename(f_name), self.chars_in_fname)}'
+                msg_long = f'Encrypting {f_name}'
         else:
             if what == 'meta':
-                self.main_l['text'] = f'Resolving Meta in {format_path(f_name, self.chars_in_fname)}',
+                msg_short = 'Resolving Meta Data...'
+                msg_long = f'Resolving Meta Data in {format_path(f_name, self.chars_in_fname)}',
             elif what == 'pointer':
-                self.main_l['text'] = f'Resolving Pointers in {format_path(f_name, self.chars_in_fname)}'
+                msg_short = 'Resolving Pointers...'
+                msg_long = f'Resolving Pointers in {format_path(f_name, self.chars_in_fname)}'
+            elif what == 'dec_status':
+                msg_short = 'verifying Integrity...'
+                msg_long = f'Verifying Encryption Integrity in {format_path(f_name, self.chars_in_fname)}'
             elif what == 'data':
-                self.main_l['text'] = f'Decrypting {format_path(f_name, self.chars_in_fname)}'
-        self.progress_bar.set(per)
+                msg_short = f'Decrypting {format_path(os.path.basename(f_name), self.chars_in_fname)}'
+                msg_long = f'Decrypting {f_name}'
+
+        self.progress_bar.set(percentage)
+        if msg_short:
+            self.main_l['text'] = msg_short
+
+        if msg_long:
+            logger.log(f'{"Encryption" if self.task == "enc" else "Decryption"} : {msg_long}')
 
 
 class EncUi(Frame):
@@ -511,9 +532,6 @@ class EncUi(Frame):
         self.master = master
         Frame.__init__(self, master, **kwargs)
 
-        self.enc = EncBatch(text_encoding=C.TextEncoding, chunk_size=C.ChunkSize, meta_base=C.MetaBase, meta_encoding=C.MetaEncoding,
-                            pointer_base=C.PointerBase, pointer_size=C.PointerSize, name_base=C.NameBase, data_code_base=C.DataTypeBase,
-                            file_data_base=C.FileDataBase, dec_status_base=C.DecCodeBase, pointer_dec_separator=C.PointerDecSeparator)
         self.pause = False
 
         self.file_in_frame = EncFileIn(self, main_tk=self.master, next_call=self.next_file_in,
@@ -526,133 +544,52 @@ class EncUi(Frame):
         self.file_in_frame.place(x=0, y=0, relwidth=1, relheight=1)
         self.file_in_frame.init()
 
+    def is_cancelled(self):
+        return self.pause
+
+    def cancel_progress(self, event=None):
+        """ go back to user input frame """
+        self.pause = True
+        logger.by_user('Encryption Cancelled by USER .....')
+
     def _encrypt_thread(self, path_seq, out_path, user_pass):
-        self.enc.clear_cache()
-        out_path = get_non_existing_path(out_path)
         logger.log('\nEncryption : Configuring encrypted file, Resolving Output Path << %s >>\n' % out_path)
 
-        # 1. encryption key
-        enc_key_index = secrets.randbelow(len(self.enc.enc_keys))
-        enc_key = self.enc.enc_keys[enc_key_index]
+        fd_seq = [open(p, 'rb') for p in path_seq]
+        enc = EncBatch()
 
-        __no = len(path_seq)
-        __f_sizes = []
-        out_f_name = os.path.basename(out_path)
-
-        # META DATA
-        logger.log('Encryption : Configuring encrypted file, Initialising Meta encoder')
-        for _path in path_seq:
-            _data_code = self.enc.text_code if is_path_textfile(_path) else self.enc.byte_code
-            _f_size = os.path.getsize(_path)
-
-            __f_sizes.append(_f_size)
-            self.enc.names.append(os.path.basename(_path))
-            self.enc.data_codes.append(str(_data_code))
-            self.enc.org_batch_size += _f_size
-            self.enc.total_batch_cal_size += _f_size if _data_code == self.enc.text_code else get_new_pos(_f_size,
-                                                                                                          self.enc.chunk_size,
-                                                                                                          0)
-
-        self.progress_frame.set('meta', out_f_name, 0.00)
-        logger.log('Encryption : Configuring encrypted file, Meta Information collected successfully')
-
-        meta_bytes = bytes(
-            f'{self.enc.meta_base}{self.enc.p}{self.enc.meta_base}{self.enc.q}{self.enc.meta_base}{self.enc.encrypt_int(enc_key_index, self.enc.primary_enc_key)}' +
-            f'{self.enc.meta_base}{self.enc.encrypt_str(self.enc.encrypt_str(user_pass, enc_key), enc_key)}{self.enc.meta_base}' +
-            f'{self.enc.encrypt_str(f"{self.enc.name_base}".join(self.enc.names), enc_key)}{self.enc.meta_base}' +
-            f'{self.enc.encrypt_str(f"{self.enc.data_code_base}".join(self.enc.data_codes), enc_key)}{self.enc.meta_base}',
-            encoding=self.enc.meta_encoding)
-
-        meta_b_size = sys.getsizeof(meta_bytes) - self.enc.void_byte_size
-        self.enc.file_pointers.append(str(self.enc.pointer_size + meta_b_size))  # first pointer
-
-        # 4. encrypting data
         try:
-            with open(out_path, 'wb+') as b__f:
-                b__f.seek(self.enc.pointer_size, 0)
-                b__f.write(meta_bytes)
-                logger.log('Encryption : Configuring encrypted file, Meta Data Dumped Successfully')
+            done = enc.encrypt_batch(fd_seq=fd_seq,
+                              pass_word=user_pass,
+                              out_batch_file_path=out_path,
+                              on_prog_callback=self.progress_frame.on_progress,
+                              cancellation_provider=self.is_cancelled)
 
-                # encryption
-                for count, path in enumerate(path_seq, start=0):
-                    if self.pause:
-                        break
-                    __start_pos = b__f.tell()
-                    _name = self.enc.names[count]
-                    _f_size = __f_sizes[count]
-
-                    # 3, writing encrypted data
-                    with open(path, 'rb') as o__f:
-                        if self.enc.data_codes[count] == str(
-                                self.enc.text_code):  # text file, no need to reed in chunks
-                            logger.log('Encryption : Encrypting << %s >> | DATA TYPE : Text | FILE SIZE : %s Bytes' % (
-                                _name, _f_size))
-                            chunk = bytes(self.enc.encrypt_str(o__f.read().decode(self.enc.text_encoding), enc_key),
-                                          encoding=self.enc.text_encoding)  # main_cli text encryption logic
-
-                            b__f.write(chunk)
-                            b__f.write(self.enc.file_data_base)
-                            self.enc.read_batch_size += _f_size
-                            self.progress_frame.set('data', _name,
-                                                    (self.enc.read_batch_size / self.enc.total_batch_cal_size) * 100)
-                            logger.log('Encryption : << %s >> encrypted successfully' % _name)
-                        else:
-                            logger.log('Encryption : Encrypting << %s >> | DATA TYPE : Bytes | FILE SIZE : %s Bytes' % (
-                                _name, _f_size))
-                            for chunk in yield_byte(o__f, size=self.enc.chunk_size):
-                                if self.pause:
-                                    break
-                                chunk.reverse()  # main_cli bytes encryption logic
-                                b__f.write(chunk)
-                                self.enc.read_batch_size += self.enc.chunk_size
-                                self.progress_frame.set('data', _name,
-                                                        (self.enc.read_batch_size / self.enc.total_batch_cal_size) * 100)
-                            b__f.write(self.enc.file_data_base)
-                            logger.log('Encryption : << %s >> encrypted successfully' % _name)
-
-                        if count != __no - 1 and not self.pause:
-                            cal_size = get_new_pos(b__f.tell(), self.enc.chunk_size,
-                                                   start=__start_pos)  # calibrating file size
-                            b__f.seek(cal_size, 0)
-                            self.enc.file_pointers.append(str(cal_size))
-
-                if not self.pause:
-                    # 5. writing pointers at beginning of file
-                    b__f.seek(0, 0)
-
-                    # saving pointers and decryption codes
-                    _dec_code_str = self.enc.dec_status_base + self.enc.dec_status_base.join(
-                        ('0', '0', str(round(time.time())))) + self.enc.dec_status_base
-                    _pointer_s = self.enc.pointer_base + f"{self.enc.pointer_base}".join(
-                        self.enc.file_pointers) + self.enc.pointer_base
-
-                    b__f.write(bytes(_pointer_s + self.enc.pointer_dec_code_sep + _dec_code_str,
-                                     encoding=self.enc.meta_encoding))
-                    logger.log('Encryption : Dumping Pointers in Encrypted File << %s >>' % out_path)
-                    self.progress_frame.set('pointer', out_f_name, 100.00)
-
-            if not self.pause:
-                self.progress_frame.cancel_call = None
-                logger.log('Encryption : Locking Encrypted File << %s >>' % out_path)
-                read_only(out_path)  # need to be cleared before decryption
-                logger.log('\nEncryption : Successful, OUTPUT PATH : %s \n' % out_path)
-                self.master.show_final_message(self, 'Encryption Successful', f'Output Encrypted File : {format_path(out_path, 50)}',
+            if done:
+                self.master.show_final_message(self, 'Encryption Successful',
+                                               f'Encrypted File : {get_name(enc.b_f_path, True)}',
                                                title_fg="#5CFF74")
-            else:
-                logger.warning('Cancelled by User, Deleting temp file : %s' % out_path)
+            elif self.is_cancelled():
+                logger.warning('Encryption cancelled by User, Deleting temp file : %s' % get_name(enc.b_f_path, True))
                 try:
                     os.remove(out_path)
                 except Exception as _del_e:
-                    logger.error('Could not delete Encrypted File << %s >> Error Code : %s' % (out_path, _del_e))
-                self.master.show_final_message(self, 'Encryption Failed', 'User Interruption : Cancelled by User')
+                    logger.error('Could not delete Encrypted File << %s >> Error Code : %s' % (get_name(enc.b_f_path, True), _del_e), _del_e)
+                finally:
+                    self.master.show_final_message(self, 'Encryption Cancelled', 'User Interruption: Cancelled by User')
 
-        except Exception as enc_e:
-            logger.error('Encryption Failed, Error Code<< %s >>' % enc_e)
+        except Exception as enc_exc:
+            logger.error('Encryption Failed, Error Code << %s >>' % enc_exc, enc_exc)
             self.master.show_final_message(self, 'Encryption failed',
-                                           f'Encrypted File : {format_path(out_path, 50)}\n\nError Code : {enc_e}')
-        self.pause = False
+                                           f'Encrypted File : {get_name(enc.b_f_path, True)}\n\nError Code : {enc_exc}')
+        finally:
+            for fd in fd_seq:
+                fd.close()
+
+            self.pause = False
 
     def _encrypt_init(self, path_seq, out_path, user_pass):
+        self.pause = False
         self.progress_frame.cancel_call = self.cancel_progress
         logger.log(f'\n-->> Encryption : Process Started')
         __th = Thread(target=self._encrypt_thread,
@@ -661,10 +598,8 @@ class EncUi(Frame):
 
     def next_file_in(self, event=None):  # Next at file input
         self.user_in_frame.init()
-        first_name = get_name(self.file_in_frame.files[0], with_ext=False)
+        self.user_in_frame.out_path.set(generate_enc_batch_file_path(self.file_in_frame.files, non_existing=True))
 
-        _name = format_path((first_name + '---' + get_name(self.file_in_frame.files[-1], with_ext=False) if len(self.file_in_frame.files) > 1 else first_name) + C.EncExt, 50)
-        self.user_in_frame.out_path.set(os.path.join(os.path.dirname(self.file_in_frame.files[0]), _name))
         self.master.animator.animate_left(self.file_in_frame, self.user_in_frame, relheight=1, y=0)
 
     def next_user_in(self, event=None):  # Next at user input
@@ -682,11 +617,6 @@ class EncUi(Frame):
         self.file_in_frame.init()
         self.master.animator.animate_right(self.user_in_frame, self.file_in_frame, relheight=1, y=0)
 
-    def cancel_progress(self, event=None):
-        """ go back to user input frame """
-        self.pause = True
-        logger.by_user('Encryption Cancelled by USER .....')
-
     def clear(self):
         # clears all encryption frames
         self.pause = False
@@ -702,10 +632,11 @@ class EncUi(Frame):
 
 
 class DecPassCheck(Frame):
-    def __init__(self, master, main_tk, chances=C.DecChances, caption='Enter Password',
+    def __init__(self, master, main_tk, chances=DecChancesPerTry, caption='Enter Password',
                  next_call=lambda _a='Pass Correct': print(_a), fail_call=lambda _a='Invalid Pass': print(_a),
                  unauthorized_call=lambda _a='Pass Unauthorized': print(_a),
                  back_call=lambda _a='Back at user pass': print(_a), **kwargs):
+
         self.master = master
         self.main_tk = main_tk
         self.next_call, self.back_call = next_call, back_call
@@ -758,7 +689,7 @@ class DecPassCheck(Frame):
                 self.left_chances -= 1
                 if self.left_chances:
                     self.check_l.configure(fg='#FF7171', text='Password Invalid, Attempts Left : %s' % self.left_chances)
-                    self.fail_call()
+                    self.fail_call(self.left_chances)
                 else:
                     self.check_l.configure(fg='#FF7171', text='Access Unauthorized : All Attempts Exhausted')
                     self.unauthorized_call()
@@ -779,7 +710,7 @@ class DecPassCheck(Frame):
         if reset_quit:
             self.main_tk.reset_quit_call()
 
-    def init(self, caption, correct_pass, left_chances=C.DecChances):
+    def init(self, caption, correct_pass, left_chances=DecChancesPerTry):
         self.main_tk.set_quit_call(self._back_call)  # quiting is same as failing
         self.cap_var.set(caption)
         self.correct_pass = correct_pass
@@ -793,138 +724,197 @@ class DecPassCheck(Frame):
 class DecUI(Frame):
     def __init__(self, master, **kwargs):
         self.master = master
-        self.dec = DecBatch(text_encoding=C.TextEncoding, chunk_size=C.ChunkSize, meta_base=C.MetaBase, meta_encoding=C.MetaEncoding,
-                            pointer_base=C.PointerBase, pointer_size=C.PointerSize, name_base=C.NameBase, data_code_base=C.DataTypeBase,
-                            file_data_base=C.FileDataBase, dec_status_base=C.DecCodeBase, pointer_dec_separator=C.PointerDecSeparator)
+        self.dec = DecBatch()
         self.file_path = ''
         self.pause = False
 
         kwargs['bg'] = bg
         Frame.__init__(self, **kwargs)
-        self.pass_check_frame = DecPassCheck(self, self.master, next_call=self.next_call,
-                                             unauthorized_call=self.unauthorized_call, fail_call=self.fail_call,
+        self.pass_check_frame = DecPassCheck(self, self.master,
+                                             next_call=self.next_call,
+                                             unauthorized_call=self.unauthorized_call,
+                                             fail_call=self.fail_call,
                                              back_call=self.back_call)
-        self.progress_frame = ProgressFrame(self, self.master, task='dec', cancel_call=self.cancel_progress)
 
-        self.pass_check_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self.progress_frame = ProgressFrame(self, self.master, task='dec', cancel_call=self.cancel_progress)
+        self.progress_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+
+    def is_cancelled(self):
+        return self.pause
+
+    def cancel_progress(self):
+        self.pause = True
+        logger.by_user(f'Decryption of << {self.file_path} >> Cancelled by User')
+
+
+    def _init_thread(self):
+        clear_read_only(self.file_path)
+
+        try:
+            with open(self.file_path, 'rb+') as e_f_des:
+                self.dec.set_header(e_f_des, on_prog_call=self.progress_frame.on_progress)
+
+                # checking blacklist status
+                dec_code, fail_count, regain_timestamp = self.dec.dec_data
+                regain_secs = round(regain_timestamp - time.time())
+                logger.log(
+                    f'\nDecryption : File : {self.file_path} | LOCK STATUS : {dec_code} | Failed Attempts : {fail_count} | Access Regain TimeStamp : {regain_timestamp}')
+
+                if dec_code in (DecFailed, DecLocked) and regain_secs > 0:
+                    regain_sec_str = format_secs(regain_secs, out='str')
+                    logger.error(f'Decryption: Access Unauthorized. Try again after : {regain_sec_str}')
+                    self.master.show_final_message(self, title=f"Access Unauthorized",
+                                                   alt=f"{get_name(self.file_path, True)} is Locked\n\nTry again after {regain_sec_str}")
+
+                elif dec_code in (DecNormal, DecFailed):
+                    self.pass_check_frame.init(f'Enter Password of {get_name(self.file_path, False)}',
+                                               self.dec.user_pass)
+                    self.master.animator.animate_left(self.progress_frame, self.pass_check_frame,
+                                                      last_call=self.progress_frame.clear,
+                                                      relheight=1, y=0)
+                elif dec_code == DecLocked:
+                    # if file is locked
+                    logger.warning(f"\n-->> Decryption: File << {self.file_path} >> is LOCKED\n")
+                    logger.log('-> Connecting to server for expert decryption verification...')
+
+                    import jkkguyv523asdasd
+
+                    if jkkguyv523asdasd.dfhds72346nh3434hsd34gsdf23h:
+                        self.pass_check_frame.init(
+                            f'{get_name(self.file_path, True)} is Locked due to Repetitive Failed Attempts\n\nEnter Expert Decryption Key to Unlock',
+                            jkkguyv523asdasd.dfhds72346nh3434hsd34gsdf23h, 1)
+                        self.master.animator.animate_left(self.progress_frame, self.pass_check_frame,
+                                                          last_call=self.progress_frame.clear,
+                                                          relheight=1, y=0)
+                    else:
+                        logger.error(f'-> Decryption: FATAL ERROR: Failed to verify Expert Decryption Key from server')
+                        self.master.show_final_message(self, title=f"File Locked",
+                                                       alt=f"{get_name(self.file_path, True)} is Locked\n\nFatal Error: Expert Decryption key could not be verified from server!!")
+        except Exception as init_exc:
+            logger.error(
+                f'Decryption: Exception while initializing decryptor for file << {self.file_path} >>, Error Code : {init_exc}',
+                init_exc)
+            self.master.show_final_message(self, title=f"Decrypting Failed",
+                                           alt=f"Encrypted File : {get_name(self.file_path, True)}\n\nError Code : {init_exc}\nSee Logs for details")
+        finally:
+            read_only(self.file_path)
+
 
     def init(self, file_path):
         # Place it first
+
+        if not os.path.isfile(file_path):
+            logger.error(f'Decryption : File << {file_path} >> does not exist')
+            self.master.show_final_message(self, title=f"File not found",
+                                           alt=f"{get_name(self.file_path, True)} does not exist!")
+            return False
+
+        if not os.path.splitext(file_path)[1] == EncExt:
+            logger.error(f'Decryption : File << {file_path} >> is not encrypted')
+            self.master.show_final_message(self, title=f"Invalid File",
+                                           alt=f"{get_name(self.file_path, True)} is not encrypted")
+            return False
+
         self.file_path = file_path
-        logger.log('\nDecryption : Process Started, INPUT FILE : << %s >>' % file_path)
-        clear_read_only(file_path)
+        logger.log(f'\nDecryption : Process Started, ENCRYPTED FILE : << {file_path} >>')
+        th = Thread(target=self._init_thread)
+        th.start()
+
+    def commit_dec_data_internal(self) -> bool:
         try:
-            logger.log('\nDecryption : Setting Header Data of << %s >>' % file_path)
-            with open(file_path, 'rb+') as o__f:
-                self.dec.set_header(o__f, on_prog_call=dummy)
-            read_only(self.file_path)
-
-            f_code, f_no, reset_time = self.dec.dec_data
-            logger.log(
-                f'\nDecryption : File : {file_path} || LOCK STATUS : {f_code} || Fail Attempts : {f_no} || TimeStamp : {reset_time} ||')
-
-            if f_code == C.DecNormal:
-                self.pass_check_frame.init(f'Enter Password of {format_path(file_path, 50)}', self.dec.user_pass,
-                                           (C.DecChances - f_no) if f_no < C.DecChances else C.DecChances)
-            elif f_code == C.DecFailed:
-                if reset_time <= time.time():
-                    self.pass_check_frame.init(f'Enter Password of {format_path(file_path, 50)}', self.dec.user_pass,
-                                               (C.DecChances - f_no) if f_no < C.DecChances else (
-                                                           C.DecChances - f_no % C.DecChances))
-                else:
-                    __reset_del = format_secs(round(reset_time - time.time()), out='str')
-                    logger.error(f'Decryption : Access Unauthorized, Access will Reset After : {__reset_del}')
-                    self.master.show_final_message(self, title=f"Access Unauthorized !",
-                                                   alt=f"{format_path(file_path, 50)} is Locked\n\nTry again after {__reset_del}")
-
-            elif f_code == C.DecLocked:
-                if reset_time <= time.time():
-                    if jkkguyv523asdasd.dfhds72346nh3434hsd34gsdf23h:
-                        self.pass_check_frame.init(
-                            f'{format_path(file_path, 50)} is Locked due to Repetitive Fail Attempts\n\nEnter Expert Decryption Key to Unlock',
-                            jkkguyv523asdasd.dfhds72346nh3434hsd34gsdf23h, 1)
-                    else:
-                        logger.error(f'Fatal Error: Failed to verify Expert Decryption Key from server!!')
-                        self.master.show_final_message(self, title=f"File Locked",
-                                                       alt=f"{format_path(file_path, 50)} is Locked\n\nFatal Error: Expert Decryption key could not be verified from server!!")
-                else:
-                    __reset_del = format_secs(round(reset_time - time.time()), out='str')
-                    logger.error(
-                        f'Decryption : Access Unauthorized, Access will Reset After : {__reset_del}')
-                    self.master.show_final_message(self, title=f"Access Unauthorized !",
-                                                   alt=f"{format_path(file_path, 50)} is Locked\n\nTry again after {__reset_del}")
-        except Exception as _dec_init_e:
-            logger.error('\n\nIn Decryption While Setting Header Data File Path : << %s >>, Error Code : %s' % (
-            file_path, _dec_init_e))
-            self.master.show_final_message(self, title=f"Decrypting Failed !",
-                                           alt=f"Encrypted File : {format_path(self.file_path, 50)}\n\nError Code : {_dec_init_e}")
-
-    def dump_dec_data(self, dec_data):
-        try:
-            with open(self.file_path, 'rb+') as o__f:
-                o__f.seek(self.dec.dec_data_pos, 0)
-                o__f.write(self.dec.get_dec_data_bytes(dec_data))
-        except Exception as _dec_dump_e:
-            self.master.show_final_message(self, title=f"Decrypting Failed !",
-                                           alt=f"Encrypted File : {format_path(self.file_path, 50)}\n\nError Code : {_dec_dump_e}")
+            self.dec.commit_dec_data_to_path(self.file_path, handle_read_only=True)
+            return True
+        except Exception as exc:
+            logger.error(f"Decryption: Exception while writing decryption status data to file << {self.file_path} >> | Error: {exc}", exc)
+            self.master.show_final_message(self, title=f"Decrypting Failed",
+                                           alt=f"Encrypted File : {get_name(self.file_path, True)}\n\nError Code : {exc}")
+            return False
 
     def back_call(self):
-        self.fail_call()
+        # self.fail_call()
         self.master.to_main_menu(self, clear=True)
 
-    def fail_call(self):
-        self.dec.dec_data[1] += 1
-        if self.dec.dec_data[1] < C.DecChances:
-            self.dec.dec_data[0] = C.DecNormal
+    def fail_call(self, chances_left):
+        logger.warning(f'\n-> Access Unauthorized. Chances Left: {chances_left}')
 
-            clear_read_only(self.file_path)
-            self.dump_dec_data(self.dec.dec_data)
-            read_only(self.file_path)
-        else:
-            if self.dec.dec_data[1] % C.DecChances == 0:  # in case of unauthorized fail (back press or quit call)
-                self.dec.dec_data[1] -= 1
-                self.unauthorized_call(show_error=False)
-            else:
-                clear_read_only(self.file_path)
-                self.dump_dec_data(self.dec.dec_data)
-                read_only(self.file_path)
-        logger.warning(
-            'Invalid Decryption Attempt || LOCK STATUS : %d || Fail Attempts : %d || TimeStamp : %d ||' % tuple(
-                self.dec.dec_data))
+        # if not self.commit_dec_data_internal():
+        #     return False
+        #
+        # if dec_code == DecFailed and regain_secs > 0:
+        #     self.master.show_final_message(self,
+        #                                    title=f"Access Unauthorized",
+        #                                    alt=f"Too many failed attempts!\n\nTry again after {format_secs(regain_secs, 'str')}")
+        #
+        # elif dec_code == DecLocked:
+        #     self.master.show_final_message(self,
+        #                                    title=f"Access Frozen",
+        #                                    alt=f"{format_path(os.path.basename(self.file_path), 50)} has been Locked. Expert Decryption Key is required to regain access")
+        # else:
+        #     return True
+        #
+        # return False
 
-    def unauthorized_call(self, show_error=True):
-        self.dec.dec_data[1] += 1
-        self.dec.dec_data[0] = C.DecFailed if self.dec.dec_data[1] < C.MaxFailChances * C.DecChances else C.DecLocked
-        __del_reset_time = C.AccessRegainSecs * (self.dec.dec_data[1] // C.DecChances)
-        __for_time = format_secs(__del_reset_time, out='str')
-        self.dec.dec_data[2] = time.time() + __del_reset_time
 
-        clear_read_only(self.file_path)
-        self.dump_dec_data(self.dec.dec_data)
-        read_only(self.file_path)
-        logger.error(
-            f'Invalid Decryption Attempt || LOCK STATUS : {self.dec.dec_data[0]} || Fail Attempts : {self.dec.dec_data[1]} || TimeStamp : {self.dec.dec_data[1]} || Access Reset Time : {__for_time} ||')
+        # if self.dec.dec_data[1] < C.DecChances:
+        #     self.dec.dec_data[0] = C.DecNormal
+        #
+        #     clear_read_only(self.file_path)
+        #     self.dump_dec_data(self.dec.dec_data)
+        #     read_only(self.file_path)
+        # else:
+        #     if self.dec.dec_data[1] % C.DecChances == 0:  # in case of unauthorized fail (back press or quit call)
+        #         self.dec.dec_data[1] -= 1
+        #         self.unauthorized_call(show_error=False)
+        #     else:
+        #         clear_read_only(self.file_path)
+        #         self.dump_dec_data(self.dec.dec_data)
+        #         read_only(self.file_path)
 
-        if show_error:
+    def unauthorized_call(self):
+        dec_code, fail_tries, regain_secs = self.dec.increment_lock_status(None, 1, False)
+        regain_secs_str = format_secs(regain_secs, out='str')
+
+        logger.warning(f'\n-> Access Unauthorized | Lock Status : {dec_code} | Failed Attempts : {fail_tries * DecChancesPerTry}' + (
+            f" | Try again after {regain_secs_str}" if regain_secs > 0 else ''))
+
+        if not self.commit_dec_data_internal():
+            return
+
+        if dec_code == DecFailed and regain_secs > 0:
             self.master.show_final_message(self,
-                                           title=f"Access Unauthorized !",
-                                           alt=f"{format_path(os.path.basename(self.file_path), 50)} has been Locked\n\nTry again after {__for_time}")
+                                           title=f"Access Unauthorized",
+                                           alt=f"Too many failed attempts!\n\nTry again after {regain_secs_str}")
+
+        elif dec_code == DecLocked:
+            self.master.show_final_message(self,
+                                           title=f"Access Frozen",
+                                           alt=f"{get_name(self.file_path, True)} has been Locked.\nExpert Decryption Key is required to regain access")
+
+
+        # self.dec.dec_data[0] = C.DecFailed if self.dec.dec_data[1] < C.MaxFailChances * C.DecChances else C.DecLocked
+        # __del_reset_time = C.AccessRegainSecs * (self.dec.dec_data[1] // C.DecChances)
+        # __for_time = format_secs(__del_reset_time, out='str')
+        # self.dec.dec_data[2] = time.time() + __del_reset_time
+        #
+        # clear_read_only(self.file_path)
+        # self.dump_dec_data(self.dec.dec_data)
+        # read_only(self.file_path)
+        # logger.error(
+        #     f'Invalid Decryption Attempt || LOCK STATUS : {self.dec.dec_data[0]} || Fail Attempts : {self.dec.dec_data[1]} || TimeStamp : {self.dec.dec_data[1]} || Access Reset Time : {__for_time} ||')
+
 
     def next_call(self):
         # 1. RESETTING DEC DATA
-        logger.log(f'\nFile : {self.file_path} || Access : Authorized\n')
-        self.dec.dec_data = [0, 0, time.time()]
-
-        clear_read_only(self.file_path)
-        self.dump_dec_data(self.dec.dec_data)
+        logger.log(f'\nDecryption -> File: {self.file_path} | Access : Authorized\n')
+        self.dec.update_lock_status(None, 0, False)
+        if not self.commit_dec_data_internal():
+            return
 
         # 2. Output dir input
         out_dir = filedialog.askdirectory(parent=self.master, initialdir="C;\\",
                                           title='Choose a directory to Decrypt Files')
-        if not out_dir:
-            _dir, _fname = os.path.split(self.file_path)
-            __name = os.path.splitext(_fname)[0]
-            out_dir = get_non_existing_path(os.path.join(_dir, format_path(__name, 30) + '(Decrypted)'))
+
+        # out_dir = generate_dec_output_dir_path(self.file_path, out_dir_pref=out_dir, non_existing=True)
 
         # 3. To Decrypt
         self.progress_frame.init()
@@ -933,85 +923,49 @@ class DecUI(Frame):
                                           relheight=1, y=0)
         self._decrypt_init(out_dir=out_dir)
 
-    def cancel_progress(self):
-        self.pause = True
-        logger.by_user(f'Decryption of << {self.file_path} >> Cancelled by User')
 
     def _decrypt_thread(self, out_dir):
         try:
-            if not os.path.isdir(out_dir):
-                os.makedirs(out_dir)
+            clear_read_only(self.file_path)
 
-            with open(self.file_path, 'rb+') as e__f:
-                e__f.seek(self.dec.file_pointers[0], 0)
-                self.dec.read_batch_size = self.dec.file_pointers[0]
+            # if out_dir and not os.path.isdir(out_dir):
+            #     os.makedirs(out_dir)
 
-                for _name, _d_code, _pointer, _n_pointer in zip(self.dec.org_file_names, self.dec.data_codes, self.dec.file_pointers,
-                                                                self.dec._next_pointers):
-                    if self.pause:
-                        break
-                    _f_path = get_non_existing_path(os.path.join(out_dir, _name))
-                    _r_size = _n_pointer - _pointer
-                    logger.log(
-                        f'Decrypting File Name : {_name} || Data Type : {"Text" if _d_code == self.dec.text_code else "Bytes"}')
+            with open(self.file_path, 'rb+') as e_f_des:
+                done = self.dec.decrypt_batch(e_f_des, set_header=False, out_dir=out_dir, on_prog_call=self.progress_frame.on_progress, cancellation_provider=self.is_cancelled)
 
-                    with open(_f_path, 'wb+') as o__f:
-                        if _d_code == self.dec.text_code:  # text file
-                            chunk = e__f.read(_r_size).split(self.dec.file_data_base)[0]
-                            o__f.write(
-                                bytes(self.dec.decrypt_str(chunk.decode(self.dec.text_encoding), self.dec.work_dec_key),
-                                      encoding=self.dec.text_encoding))
+            if done:
+                self.progress_frame.cancel_call = None
+                logger.log(f'\nDecryption : File << {self.file_path} >> Decrypted Successfully, OUTPUT FOLDER : {self.dec.out_dir} \n')
+                self.master.show_final_message(self, title=f"Decryption Successful",
+                                               alt=f"Encrypted File : {get_name(self.file_path, True)}\nOutput Folder : {self.dec.out_dir}",
+                                               title_fg='#5CFF74',
+                                               alt_fg='skyblue')
 
-                            self.dec.read_batch_size += _r_size
-                            self.progress_frame.set('data', _name,
-                                                    (self.dec.read_batch_size / self.dec.total_batch_size) * 100)
-                        else:
-                            _r_iters = int(_r_size / self.dec.chunk_size)
-                            for _iter in range(0, _r_iters):
-                                if self.pause:
-                                    break
-                                chunk = bytearray(e__f.read(self.dec.chunk_size))
-                                if _iter == _r_iters - 1:  # last iteration
-                                    chunk = chunk.split(self.dec.file_data_base)[0]
-                                chunk.reverse()
-                                o__f.write(chunk)
-
-                                self.dec.read_batch_size += self.dec.chunk_size
-                                self.progress_frame.set('data', _name,
-                                                        (self.dec.read_batch_size / self.dec.total_batch_size) * 100)
-                if not self.pause:
-                    self.progress_frame.cancel_call = None
-                    logger.log('\nDecryption : File %s Decrypted Successful, OUTPUT Directory : %s \n' % (
-                    self.file_path, out_dir))
-                    self.master.show_final_message(self, title=f"Decryption Successful !",
-                                                   alt=f"Encrypted File : {format_path(os.path.basename(self.file_path), 50)}\n\nOutput Dir : {out_dir}",
-                                                   title_fg='#5CFF74',
-                                                   alt_fg='skyblue')
-
-                else:
-                    self.master.show_final_message(self, title=f"Decryption Failed !",
-                                                   alt=f"Encrypted File : {format_path(self.file_path, 50)}\n\nError Code : User Cancelled the Operation")
-
+            elif self.is_cancelled():
+                logger.warning('Decryption cancelled by User. Cleaning up...')
+                self.master.show_final_message(self, title=f"Decryption Cancelled",
+                                               alt=f"Encrypted File : {get_name(self.file_path, True)}\nUser Interruption: Cancelled by User")
+        except Exception as dec_exc:
+            logger.error(f'Error While Decrypting << {self.file_path} >> : {dec_exc}', dec_exc)
+            self.master.show_final_message(self, title=f"Decryption failed",
+                                           alt=f"Encrypted File : {get_name(self.file_path, True)}\nError Code : {dec_exc}\nSee Logs for details")
+        finally:
             read_only(self.file_path)
-        except Exception as __dec_th_e:
-            logger.error('Error While Decrypting << %s >> : %s' % (self.file_path, __dec_th_e))
-            read_only(self.file_path)
-            self.master.show_final_message(self, title=f"Decryption failed !",
-                                           alt=f"Encrypted File : {format_path(self.file_path, 50)}\n\nError Code : {__dec_th_e}")
-
-        self.pause = False
+            self.pause = False
 
     def _decrypt_init(self, out_dir):
+        self.pause = False
         self.progress_frame.cancel_call = self.cancel_progress
         logger.log(f'\n-->> Decryption : Process Started')
-        if is_writable(out_dir):
+        if is_dir_writable(out_dir):
             __th = Thread(target=self._decrypt_thread, kwargs={'out_dir': out_dir})
             __th.start()
         else:
             logger.error('Decryption : Output Directory does not have write access')
             read_only(self.file_path)
-            self.master.show_final_message(self, title=f"Decryption failed !",
-                                           alt=f"Encrypted File : {format_path(self.file_path, 50)}\n\nError Code : Output Dir Does not have write access")
+            self.master.show_final_message(self, title=f"Decryption Failed",
+                                           alt=f"Encrypted File : {get_name(self.file_path, True)}\n\nError Code : Output dolder does not have write access")
 
     def clear(self):
         self.file_path = ''
@@ -1019,9 +973,10 @@ class DecUI(Frame):
         self.dec.clear_cache()
         self.pass_check_frame.clear()
         self.progress_frame.clear()
-        self.progress_frame.place_forget()
 
-        self.pass_check_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self.pass_check_frame.place_forget()
+        self.progress_frame.place_forget()
+        self.progress_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
 
 
 class FinishFrame(Frame):
@@ -1092,7 +1047,7 @@ class MainMenu(Frame):
 
 
 class UI(Tk):
-    def __init__(self, size=C.UiSize, pos=(0, 0), loop_interval=C.UiLoopInterval, center=True):
+    def __init__(self, size=C.UiSize, pos=(0, 0), loop_interval=C.UiLoopInterval, frame_animation_enabled=C.UiFrameAnimationEnabled, center=True):
         self.width, self.height = size
 
         self.loop_funcs = []  # functions to be executed in loop
@@ -1120,6 +1075,8 @@ class UI(Tk):
 
         # ...............................        Main Instances       ...........................
         self.animator = FrameAnimator(self, anm_time=C.UiFrameAnimationTime, anm_step=C.UiFrameAnimationStep)
+        self.animator.enabled = frame_animation_enabled
+
         self.main_menu_frame = MainMenu(self, enc_command=self.anm_to_encryption, dec_command=self.force_to_decryption)
         self.enc_frame = EncUi(self)
         self.dec_frame = DecUI(self)
@@ -1152,10 +1109,10 @@ class UI(Tk):
                     self.dec_frame.tkraise()
                 else:
                     self.show_final_message(self.main_menu_frame, 'File Load Error',
-                                            f'{format_path(enc_f_path, 50)} : Either not Encrypted or Corrupted')
+                                            f'{get_name(enc_f_path, True)} : Either not Encrypted or Corrupted')
             else:
                 self.show_final_message(self.main_menu_frame, 'File Load Error',
-                                        f'{format_path(enc_f_path, 50)} : Either Does not Exists')
+                                        f'{get_name(enc_f_path, True)} : Either Does not Exists')
 
     def show_final_message(self, prev_frame, title, alt='Press Finish to go back to Main Menu', title_fg='#FF7171',
                            alt_fg='skyblue'):
@@ -1228,17 +1185,15 @@ if not _check_code:
     __e_win.destroy()
     sys.exit()
 
-
 # Logger
 logger = Logger(C.log_file_path)
 logger.clear()
 logger.log(f'.......................  RC File Encryptor v{C.Version}............................')
 logger.log(f'Session : Started at {time.ctime()}')
 
-
 # MAIN WINDOW
 load_ext_fonts()
-win = UI(size=(530, 275))
+win = UI()
 win.by_sys()  # Loading by sys args
 
 win.mainloop()

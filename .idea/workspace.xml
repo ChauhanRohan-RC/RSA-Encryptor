@@ -10,8 +10,8 @@
       <change beforePath="$PROJECT_DIR$/UI.py" beforeDir="false" afterPath="$PROJECT_DIR$/UI.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/__c.py" beforeDir="false" afterPath="$PROJECT_DIR$/__c.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/crypt_api.py" beforeDir="false" afterPath="$PROJECT_DIR$/crypt_api.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/exe/CLI/RCrypt CLI v8.0.0.exe" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/exe/CLI/RCrypt CLI.exe" beforeDir="false" afterPath="$PROJECT_DIR$/exe/CLI/RCrypt CLI.exe" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tkwidgets.py" beforeDir="false" afterPath="$PROJECT_DIR$/tkwidgets.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -59,7 +59,7 @@
       <recent name="D:\RC\Projects\Pycharm\Encryption\sdk" />
     </key>
   </component>
-  <component name="RunManager" selected="Shell Script.build_cli">
+  <component name="RunManager" selected="Python.pack_setup_info">
     <configuration name="CLI" type="PythonConfigurationType" factoryName="Python">
       <module name="Encryption" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -91,7 +91,7 @@
       </envs>
       <option name="SDK_HOME" value="C:\Users\RC\AppData\Local\Programs\Python\Python37-32\python.exe" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-      <option name="IS_MODULE_SDK" value="false" />
+      <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/UI.__init__.py" />
@@ -112,7 +112,7 @@
       </envs>
       <option name="SDK_HOME" value="C:\Users\RC\AppData\Local\Programs\Python\Python37-32\python.exe" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-      <option name="IS_MODULE_SDK" value="false" />
+      <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/pack_setup_info.py" />

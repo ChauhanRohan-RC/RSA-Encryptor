@@ -1,5 +1,7 @@
 import os
 import sys
+import traceback
+
 
 # ..............................................   Static Functions   .........................
 def rgb(*r_g_b):
@@ -60,11 +62,19 @@ class Logger:
         with open(self.file_path, 'a+') as l__f:
             l__f.write('\n' + text)
 
-    def warning(self, warning):
-        self.log(f'\n -->> WARNING : {warning}\n')
+    def log_exc(self, exc):
+        s = "".join(traceback.format_exception(exc))
+        self.log(s)
 
-    def error(self, error):
-        self.log(f'\n -->> ERROR : {error}\n')
+    def warning(self, warning, exc=None):
+        self.log(f'\n -->> WARNING : {warning}\n')
+        if exc:
+            self.log_exc(exc)
+
+    def error(self, msg, exc=None):
+        self.log(f'\n -->> ERROR : {msg}\n')
+        if exc:
+            self.log_exc(exc)
 
     def by_user(self, message):
         self.log(f'\n --> User Interruption : {message}\n')
@@ -74,7 +84,7 @@ class Logger:
 
 
 class C:
-    Version = "8.2.0"
+    Version = "9.0.0"
     EncExt = ".rce"
 
     ExeName = "Rcrypt"
@@ -146,8 +156,9 @@ class C:
 
     # ..........................   UI constants   ........................
     UiTitle = f'Rcrypt v{Version}'
-    UiSize = (600, 400)
+    UiSize = (900, 500)
     UiLoopInterval = 500  # in ms
+    UiFrameAnimationEnabled = False
     UiFrameAnimationTime = 140  # in ms
     UiFrameAnimationStep = 0.1  # in relx or relwidth
 

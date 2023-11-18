@@ -168,6 +168,7 @@ class FrameAnimator:
     """
     def __init__(self, master, anm_time=130, anm_step=0.02):
         self.master = master         # to loop using after method
+        self.enabled = True
         self.anm_time = anm_time     # time in ms to complete animation (relwidth from 0 to 1) or (relx from 1 to 0)
         self.anm_step = anm_step     # increment step at each iteration (of relwidth or relx)
         self._max_anm_rel = 1.00 - self.anm_step
@@ -183,6 +184,16 @@ class FrameAnimator:
 
         self._anm_time = round(self.anm_time * self.anm_step)
 
+    def _finish_translate(self, f1, f2, **place_kwargs):
+        f1.place_forget()
+
+        place_kwargs['relx'] = 0
+        place_kwargs['relwidth'] = 1
+        f2.place_configure(**place_kwargs)
+        if self.last_call:
+            self.last_call(*self.last_args)
+            self.last_call = self.last_args = None
+
     def _animate_left(self, f1, f2, cur_w=0.00):
         if cur_w < self._max_anm_rel:
             cur_w += self.anm_step
@@ -192,11 +203,7 @@ class FrameAnimator:
 
             self.master.after(self._anm_time, self._animate_left, f1, f2, cur_w)
         else:
-            f1.place_forget()
-            f2.place_configure(relwidth=1, relx=0)
-            if self.last_call:
-                self.last_call(*self.last_args)
-                self.last_call = self.last_args = None
+            self._finish_translate(f1, f2)
 
     def animate_left(self, frame_1, frame_2, last_call=None, *last_args, **place_kwargs):
         """
@@ -206,14 +213,18 @@ class FrameAnimator:
         :param frame_2: frame to be placed, got filled after animation in X
         :param place_kwargs : place kwargs for frame2
         """
-        place_kwargs['relx'] = 1
-        place_kwargs['relwidth'] = 0
-        frame_2.place(**place_kwargs)
-        frame_2.tkraise()
 
         self.last_call = last_call
         self.last_args = last_args
-        self.master.after(self._anm_time, self._animate_left, frame_1, frame_2, 0.00)
+
+        if self.enabled:
+            place_kwargs['relx'] = 1
+            place_kwargs['relwidth'] = 0
+            frame_2.place(**place_kwargs)
+            frame_2.tkraise()
+            self.master.after(self._anm_time, self._animate_left, frame_1, frame_2, 0.00)
+        else:
+            self._finish_translate(frame_1, frame_2, **place_kwargs)
 
     def _animate_right(self, f1, f2, cur_w=0.00):
         if cur_w < self._max_anm_rel:
@@ -224,11 +235,7 @@ class FrameAnimator:
 
             self.master.after(self._anm_time, self._animate_right, f1, f2, cur_w)
         else:
-            f1.place_forget()
-            f2.place_configure(relwidth=1)
-            if self.last_call:
-                self.last_call(*self.last_args)
-                self.last_call = self.last_args = None
+            self._finish_translate(f1, f2)
 
     def animate_right(self, frame_1, frame_2, last_call=None, *last_args, **place_kwargs):
         """
@@ -238,13 +245,27 @@ class FrameAnimator:
         :param frame_2: frame to be placed, got filled after animation in X
         :param place_kwargs : place kwargs for frame2
         """
-        place_kwargs['relx'] = place_kwargs['relwidth'] = 0
-        frame_2.place(**place_kwargs)
-        frame_2.tkraise()
-
         self.last_call = last_call
         self.last_args = last_args
-        self.master.after(self._anm_time, self._animate_right, frame_1, frame_2, 0.00)
+
+        if self.enabled:
+            place_kwargs['relx'] = place_kwargs['relwidth'] = 0
+            frame_2.place(**place_kwargs)
+            frame_2.tkraise()
+            self.master.after(self._anm_time, self._animate_right, frame_1, frame_2, 0.00)
+        else:
+            self._finish_translate(frame_1, frame_2, **place_kwargs)
+
+    def _finish_zoom(self, f1, f2, **place_kwargs):
+        f1.place_forget()
+
+        place_kwargs['relheight'] = 1
+        place_kwargs['relwidth'] = 1
+        f2.place_configure(**place_kwargs)
+        if self.last_call:
+            self.last_call(*self.last_args)
+            self.last_call = self.last_args = None
+
 
     def _animate_zoom_in(self, f1, f2, cur_w=0):
         if cur_w < self._max_anm_rel:
@@ -252,18 +273,19 @@ class FrameAnimator:
             f2.place_configure(relwidth=cur_w, relheight=cur_w)
             self.master.after(self._anm_time, self._animate_zoom_in, f1, f2, cur_w)
         else:
-            f1.place_forget()
-            f2.place_configure(relwidth=1, relheight=1)
-            if self.last_call:
-                self.last_call(*self.last_args)
-                self.last_call = self.last_args = None
+            self._finish_zoom(f1, f2)
 
     def animate_zoom_in(self, frame_1, frame_2, last_call=None, *last_args):
-        frame_2.place(relx=0.5, rely=0.5, relwidth=0, relheight=0, anchor='center')
-        frame_2.tkraise()
         self.last_call = last_call
         self.last_args = last_args
-        self.master.after(self._anm_time, self._animate_zoom_in, frame_1, frame_2, 0)
+
+        if self.enabled:
+            frame_2.place(relx=0.5, rely=0.5, relwidth=0, relheight=0, anchor='center')
+            frame_2.tkraise()
+
+            self.master.after(self._anm_time, self._animate_zoom_in, frame_1, frame_2, 0)
+        else:
+            self._finish_zoom(frame_1, frame_2)
 
     def _animate_zoom_out(self, f1, f2, cur_w=1.00):
         if cur_w > self.anm_step:
@@ -271,17 +293,18 @@ class FrameAnimator:
             f1.place_configure(relwidth=cur_w, relheight=cur_w)
             self.master.after(self._anm_time, self._animate_zoom_out, f1, f2, cur_w)
         else:
-            f2.tkraise()
-            f1.place_forget()
-            if self.last_call:
-                self.last_call(*self.last_args)
-                self.last_call = self.last_args = None
+            self._finish_zoom(f1, f2)
 
     def animate_zoom_out(self, frame_1, frame_2, last_call=None, *last_args):
-        frame_2.place(relx=0.5, rely=0.5, relwidth=1, relheight=1, anchor='center')
         self.last_call = last_call
         self.last_args = last_args
-        self.master.after(self._anm_time, self._animate_zoom_out, frame_1, frame_2, 1.00)
+
+        if self.enabled:
+            frame_2.place(relx=0.5, rely=0.5, relwidth=1, relheight=1, anchor='center')
+            frame_2.tkraise()
+            self.master.after(self._anm_time, self._animate_zoom_out, frame_1, frame_2, 1.00)
+        else:
+            self._finish_zoom(frame_1, frame_2)
 
 
 class LeftNotification(Frame):

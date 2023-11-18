@@ -7,6 +7,8 @@ from crypt_api import *
 import pwinput
 
 # cache progress vars
+_enc_prog_mode = ''
+_dec_prog_mode = ''
 _file_in_enc_prog = ''
 _file_in_dec_prog = ''
 
@@ -46,48 +48,57 @@ def perform_pre_checks():  # to ensure all directories and resources exists
 
 
 def enc_prog(what, f_name, per):
+    global _enc_prog_mode
     global _file_in_enc_prog
+
+    if _enc_prog_mode != what:
+        print("\n", end="")
+        _enc_prog_mode = what
+
     if what == 'path':
-        print(color(f'\n-> Resolving Output File Path : <<{Cs.FileName} {f_name} {Cs.ProgressHead}>>', Cs.ProgressHead))
+        print(color(f'-> Creating Encrypted File : {Cs.ProgressPer}{per} %{Cs.ProgressHead}', Cs.ProgressHead), end='\r')
     elif what == 'meta':
-        print(color(f'\n-> Packing Meta in file <<{Cs.FileName} {os.path.basename(f_name)} {Cs.ProgressHead}>>',
-                    Cs.ProgressHead))
+        print(color(f'-> Encrypting Meta Data : {Cs.ProgressPer}{per} %{Cs.ProgressHead}', Cs.ProgressHead), end='\r')
     elif what == 'pointer':
         print(
-            color(f'\n-> Packing Data Pointers in file <<{Cs.FileName} {os.path.basename(f_name)} {Cs.ProgressHead}>>',
-                  Cs.ProgressHead))
+            color(f'-> Encrypting Pointers : {Cs.ProgressPer}{per} %{Cs.ProgressHead}', Cs.ProgressHead), end='\r')
+    elif what == 'dec_status':
+        print(color(
+            f'-> Validating Encryption Integrity : {Cs.ProgressPer}{per} %{Cs.ProgressHead}', Cs.ProgressHead), end='\r')
     elif what == 'data':
-        if _file_in_enc_prog == f_name:
-            print(color(
-                f'--> Encrypting file <<{Cs.FileName} {f_name} {Cs.Progress}>> : {Cs.ProgressPer}{per} %{Cs.Progress}',
-                Cs.Progress), end='\r')
-        else:
-            print(color(
-                f'\n--> Encrypting file <<{Cs.FileName} {f_name} {Cs.Progress}>> : {Cs.ProgressPer}{per} %{Cs.Progress}',
-                Cs.Progress), end='\r')
+        if _file_in_enc_prog != f_name:
+            print("\n", end="")
             _file_in_enc_prog = f_name
+
+        print(color(
+            f'--> Encrypting <<{Cs.FileName} {f_name} {Cs.Progress}>> : {Cs.ProgressPer}{per} %{Cs.Progress}',
+            Cs.Progress), end='\r')
 
 
 def dec_prog(what, f_name, per):
+    global _dec_prog_mode
     global _file_in_dec_prog
+
+    if _dec_prog_mode != what:
+        print("\n", end='')
+        _dec_prog_mode = what
+
     if what == 'meta':
         print(color(
-            f'\n-> Resolving Meta Data in Encrypted file <<{Cs.FileName} {os.path.basename(os.path.realpath(f_name))[:25]}... {Cs.ProgressHead}>>',
-            Cs.ProgressHead))
+            f'-> Resolving Meta Data : {Cs.ProgressPer}{per} %{Cs.ProgressHead}', Cs.ProgressHead), end='\r')
     elif what == 'pointer':
         print(color(
-            f'\n-> Resolving Pointers in Encrypted file <<{Cs.FileName} {os.path.basename(os.path.realpath(f_name))[:25]}... {Cs.ProgressHead}>>',
-            Cs.ProgressHead))
+            f'-> Resolving Pointers : {Cs.ProgressPer}{per} %{Cs.ProgressHead}', Cs.ProgressHead), end='\r')
+    elif what == 'dec_status':
+        print(color(
+            f'-> Verifying Encryption Integrity : {Cs.ProgressPer}{per} %{Cs.ProgressHead}', Cs.ProgressHead), end='\r')
     elif what == 'data':
-        if _file_in_dec_prog == f_name:
-            print(color(
-                f'--> Decrypting file <<{Cs.FileName} {f_name} {Cs.Progress}>> : {Cs.ProgressPer}{per} %{Cs.Progress}',
-                Cs.Progress), end='\r')
-        else:
-            print(color(
-                f'\n--> Decrypting file <<{Cs.FileName} {f_name} {Cs.Progress}>> : {Cs.ProgressPer}{per} %{Cs.Progress}',
-                Cs.Progress), end='\r')
+        if _file_in_dec_prog != f_name:
+            print("\n", end="")
             _file_in_dec_prog = f_name
+        print(color(
+            f'--> Decrypting file <<{Cs.FileName} {f_name} {Cs.Progress}>> : {Cs.ProgressPer}{per} %{Cs.Progress}',
+            Cs.Progress), end='\r')
 
 
 def _validate_pass(pass_word):
@@ -126,7 +137,7 @@ def _input_pass_internal(prompt, min_length):
             return cur_pass
 
 
-def get_pass(choose_prompt='-->> Choose Password: ', confirm_prompt='-->> Confirm Password: ', min_length=6,
+def get_pass(choose_prompt='-->> Choose Password: ', confirm_prompt='-->> Confirm Password: ', min_length=C.PassMinChars,
              confirm_chances=2):
     print(color(
         f'\n-->> Note : Password must be at least {min_length} chars long, with an upper case, lower case, special char and digit)',
@@ -150,13 +161,20 @@ def get_pass(choose_prompt='-->> Choose Password: ', confirm_prompt='-->> Confir
     return in_pass
 
 
-def check_pass(c_pass, chances=3, file_name='', prompt='\n-->> Enter Password: '):
+def check_pass(c_pass, chances=3, file_name='', prompt='\n-->> Enter Password: ', fail_call=None):
     __cap = f'{prompt} {"" if not file_name else f"of <<{Cs.FileName} {file_name} {Cs.UserInput}>> "}: '
+
+    i = 0
     while chances:
         __in = pwinput.pwinput(prompt=__cap, mask="*")
         if __in == c_pass:
             return True
+
         chances -= 1
+        i += 1
+        if fail_call and not fail_call(i):
+            return False
+
         if chances:
             print(color(f'-> Access Unauthorized. Attempts Left : {Cs.HighLight}{chances}{Cs.Warning}', Cs.Warning))
 
@@ -215,11 +233,8 @@ def encrypt_files(path_seq):
 
         encryptor = get_encryptor()
         try:
-            encryptor.encrypt_batch(fd_seq=fd_seq, pass_word=__in, b_f_path=out_path, enc_ext=EncExt,
-                                    on_prog_call=enc_prog)
+            encryptor.encrypt_batch(fd_seq=fd_seq, pass_word=__in, out_batch_file_path=out_path, on_prog_callback=enc_prog)
         except Exception as enc_e:
-            traceback.print_exc()
-            traceback.print_exception(enc_e)
             print(color(
                 f'\n\n-> Exception while encrypting <<{Cs.FileName} {os.path.basename(encryptor.b_f_path)} {Cs.Error}>> : {Cs.HighLight}{enc_e}{Cs.Error}',
                 Cs.Error))
@@ -273,7 +288,7 @@ def decrypt_file(e_f_path, chances=DecChancesPerTry):
             decryptor.set_header(e_f_des, on_prog_call=dec_prog)
 
             # checking blacklist status
-            dec_code, fail_count, regain_timestamp, = decryptor.dec_data
+            dec_code, fail_tries, regain_timestamp = decryptor.dec_data
             if dec_code == DecFailed:
                 regain_secs = regain_timestamp - round(time.time())
                 if regain_secs > 0:
@@ -283,16 +298,18 @@ def decrypt_file(e_f_path, chances=DecChancesPerTry):
                     return False
 
             if dec_code in (DecNormal, DecFailed):
-                if check_pass(c_pass=get_decryptor().user_pass, chances=chances,
-                              file_name=os.path.basename(e_f_path)):
+                if check_pass(c_pass=get_decryptor().user_pass,
+                              chances=chances,
+                              file_name=os.path.basename(e_f_path),
+                              fail_call=None):
                     if dec_code != DecNormal:
                         decryptor.update_lock_status(e_f_des, 0, commit=True)
                     _main_decryption(e_f_des)
                 else:
-                    dec_code, regain_secs = decryptor.update_lock_status(e_f_des, fail_count + 1, commit=True)
-                    if dec_code == DecFailed:
+                    dec_code, fail_tries, regain_secs = decryptor.increment_lock_status(e_f_des, 1, commit=True)
+                    if dec_code == DecFailed and regain_secs > 0:
                         print(color(
-                            f'\n--> Access Unauthorized : {Cs.HighLight}Fail Attempts : {(fail_count + 1) * DecChancesPerTry}{Cs.Error}, Try Again After {Cs.HighLight}<< {format_secs(regain_secs, out="str")} >>{Cs.Error}....'),
+                            f'\n--> Access Unauthorized : {Cs.HighLight}Fail Attempts : {fail_tries * DecChancesPerTry}{Cs.Error}, Try Again After {Cs.HighLight}<< {format_secs(regain_secs, out="str")} >>{Cs.Error}....'),
                             Cs.Error)
                     elif dec_code == DecLocked:
                         print(color(

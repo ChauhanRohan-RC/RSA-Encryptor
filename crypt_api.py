@@ -44,7 +44,7 @@ AccessRegainSecsExponent = 1
 
 # Encodings
 MetaEncoding = 'utf-8'  # Meta and Pointer Data Encoding
-TextEncoding = 'utf-8'  # Text File Data Encoding
+# TextEncoding = 'utf-8'  # Text File Data Encoding
 
 # ..............................   Separators   .....................
 TextBase = ':'  # joins encrypted ints in a string
@@ -204,6 +204,9 @@ def yield_byte(fd, size=4096, mutable=True):
 #             return True
 
 
+def get_fd_path(fd):
+    return os.path.realpath(fd.name)
+
 def get_file_size(fd):
     """
     :param fd: file descriptor object
@@ -271,9 +274,37 @@ def get_non_existing_path(path: str, return_suffix: bool = False):
 
     return (num, temp) if return_suffix else temp
 
+ENCRYPTED_FILE_NAME_DEFAULT = 'Untitled'
+ENCRYPTED_FILE_TAG = '(encrypted)'
+DECRYPTED_DIR_TAG = '(decrypted)'
 
-def create_batch_file_name(names) -> str:
-    return f'{names[0]} (encrypted)'
+
+def generate_enc_batch_file_path(file_paths, enc_ext=EncExt, non_existing=True) -> str:
+    if file_paths and len(file_paths) > 0:
+        _dir = os.path.dirname(file_paths[0])
+        _name = os.path.splitext(os.path.basename(file_paths[0]))[0]
+    else:
+        _dir = os.getenv('UserProfile')
+        _name = ENCRYPTED_FILE_NAME_DEFAULT
+
+    path = os.path.join(_dir, f'{_name} {ENCRYPTED_FILE_TAG}{enc_ext}')
+    if non_existing:
+        path = get_non_existing_path(path)
+
+    return path
+
+
+def generate_dec_output_dir_path(enc_file_path, out_dir_pref=None, non_existing=True):
+    _name_parsed = os.path.splitext(os.path.basename(enc_file_path))[0].strip().removesuffix(ENCRYPTED_FILE_TAG).strip()
+
+    _dir = out_dir_pref if out_dir_pref else os.path.dirname(enc_file_path)
+    _name = f"{_name_parsed} {DECRYPTED_DIR_TAG}"
+    out_dir = os.path.join(_dir, _name)
+
+    if non_existing:
+        out_dir = get_non_existing_path(out_dir)
+    return out_dir
+
 
 
 # def get_new_pos(cur_pos, chunk_size, start=0):
@@ -301,7 +332,7 @@ def clear_read_only(file_path):
         return True
 
 
-def is_writable(path):
+def is_dir_writable(path):
     __dir = path if os.path.splitext(path)[1] == '' else os.path.dirname(path)
     try:
         if not os.path.isdir(__dir):
@@ -580,7 +611,17 @@ class EncBatch(Encryptor):
 
         return self.meta_base + main + self.meta_base
 
-    def encrypt_batch(self, fd_seq, pass_word, b_f_path=None, enc_ext=EncExt, on_prog_call=lambda *args: print(args)):
+    def encrypt_batch(self, fd_seq, pass_word, out_batch_file_path=None, enc_ext=EncExt, on_prog_callback=lambda *args: print(args), cancellation_provider=None):
+        """
+        :param fd_seq: input file descriptors
+        :param pass_word: pass word
+        :param out_batch_file_path: output encrypted batch file path
+        :param enc_ext: encrypted file extension
+        :param on_prog_callback: Progress callback. receives 3 arguments (what, file_name, prog_percentage)
+        :param cancellation_provider: A cancellation signal
+        :return:True if encryption completed, False if cancelled
+        """
+
         self.clear_cache()
 
         # 1. encryption key
@@ -589,22 +630,22 @@ class EncBatch(Encryptor):
 
         file_names = []
         for fd in fd_seq:
-            _f_name = os.path.basename(os.path.realpath(fd.name))
+            _f_name = os.path.basename(get_fd_path(fd))
             _f_size = get_file_size(fd)
 
             file_names.append(_f_name)
             self.org_batch_size += _f_size
 
         # 2. configuring path of output batch file
-        if not b_f_path:  # out batch enc file
-            __dir = os.path.dirname(os.path.realpath(fd_seq[0].name))
-            # __name = "_".join(os.path.splitext(i)[0][:10] for i in self.names[:5])
-            __name = create_batch_file_name(file_names)
-            b_f_path = os.path.join(__dir, f'{__name}{enc_ext}')
+        if not out_batch_file_path:  # out batch enc file
+            out_batch_file_path = generate_enc_batch_file_path([get_fd_path(fd) for fd in fd_seq], non_existing=False)
 
-        self.b_f_path = get_non_existing_path(b_f_path)
-        on_prog_call('path', self.b_f_path, 0)
+        self.b_f_path = get_non_existing_path(out_batch_file_path)
+        on_prog_callback('path', self.b_f_path, 0)
         __no = len(fd_seq)  # no of files
+
+        if cancellation_provider and cancellation_provider():
+            return False
 
         # leaving space for the pointers to meta, file_pointers and dec_status_data
         enc_start_pos = MEM_POINTER_BYTES * 3
@@ -616,53 +657,60 @@ class EncBatch(Encryptor):
             for count, fd in enumerate(fd_seq, start=0):
                 self.file_pointers.append(e_f_des.tell())
 
-                _f_name = os.path.basename(os.path.realpath(fd.name))
+                _f_name = os.path.basename(get_fd_path(fd))
 
                 # 3, writing encrypted data
                 fd.seek(0, 0)  # sets file pos to start
 
                 for chunk in yield_byte(fd, size=self.org_chunk_size, mutable=False):
+                    if cancellation_provider and cancellation_provider():
+                        return False
+
                     enc_chunk = self.encrypt_bytes(chunk, enc_key)
                     e_f_des.write(enc_chunk)
 
                     self.read_batch_size += len(chunk)
-                    on_prog_call('data',
-                                 _f_name,
-                                 min(round((self.read_batch_size / self.org_batch_size) * 100, 2), 100))
+                    on_prog_callback('data',
+                                     _f_name,
+                                     min(round((self.read_batch_size / self.org_batch_size) * 100, 2), 100))
 
             # 4. writing meta information
+            on_prog_callback('meta', self.b_f_path, 0)
             pos_meta_start = e_f_des.tell()
             self.file_pointers.append(pos_meta_start)  # end of last file enc data
-
-            on_prog_call('meta', self.b_f_path, 1)
             meta_str = self.get_meta_str(file_names, enc_key_index, pass_word, enc_key)
+            on_prog_callback('meta', self.b_f_path, 30)
             meta_bytes = meta_str.encode(self.meta_encoding)
+            on_prog_callback('meta', self.b_f_path, 40)
             e_f_des.write(meta_bytes)
 
             # 4. writing pointers
+            on_prog_callback('pointers', self.b_f_path, 50)
             pos_pointers_start = e_f_des.tell()
-
-            on_prog_call('pointers', self.b_f_path, 100)
             file_pointers_str = self.pointer_base + f"{self.pointer_base}".join(
                 map(str, self.file_pointers)) + self.pointer_base
             file_pointers_bytes = file_pointers_str.encode(self.meta_encoding)
+            on_prog_callback('pointers', self.b_f_path, 60)
             e_f_des.write(file_pointers_bytes)
 
             # 5. Writing decryption status data
+            on_prog_callback('dec_status', self.b_f_path, 70)
             pos_dec_status_start = e_f_des.tell()
             dec_status_str = self.dec_status_base + self.dec_status_base.join(
                 map(str, (0, 0, round(time.time())))) + self.dec_status_base
-
             dec_status_bytes = dec_status_str.encode(self.meta_encoding)
             e_f_des.write(dec_status_bytes)
+            on_prog_callback('dec_status', self.b_f_path, 80)
 
             # 6. Writing header memory pointers at start
             e_f_des.seek(0, 0)
             e_f_des.write(int_to_bytes(pos_meta_start, MEM_POINTER_BYTES))
             e_f_des.write(int_to_bytes(pos_pointers_start, MEM_POINTER_BYTES))
             e_f_des.write(int_to_bytes(pos_dec_status_start, MEM_POINTER_BYTES))
+            on_prog_callback('dec_status', self.b_f_path, 100)
 
         read_only(self.b_f_path)  # need to be cleared before decryption
+        return True
 
 
 class DecBatch(Decryptor):
@@ -742,6 +790,9 @@ class DecBatch(Decryptor):
         sets meta info and pointers, also sets file position to first pointer
         """
         self.clear_cache()
+        e_b_path = get_fd_path(e_b_des)
+
+        on_prog_call('meta', e_b_path, 0)
         self.total_batch_size = get_file_size(e_b_des)
 
         # 1. Read head pointers from file
@@ -752,79 +803,107 @@ class DecBatch(Decryptor):
         self.head_pointers = [meta_start, file_pointers_start, dec_status_start]
         self.read_batch_size += MEM_POINTER_BYTES * 3
 
+        on_prog_call('meta', e_b_path, 5)
+
         # 2. Read meta information
         meta_size = file_pointers_start - meta_start
-        on_prog_call('meta', e_b_des.name, round((self.read_batch_size / self.total_batch_size) * 100, 2))
-
+        # on_prog_call('meta', get_fd_path(e_b_des), round((self.read_batch_size / self.total_batch_size) * 100, 2))
         e_b_des.seek(meta_start, 0)
         meta_bytes = e_b_des.read(meta_size)
+        on_prog_call('meta', e_b_path, 20)
         self.set_meta_info(meta_bytes)
         self.read_batch_size += meta_size
 
         # 3. Read file pointers
+        on_prog_call('pointer', e_b_path, 50)
         file_pointers_size = dec_status_start - file_pointers_start
-        on_prog_call('pointer', e_b_des.name, round((self.read_batch_size / self.total_batch_size) * 100, 2))
-
+        # on_prog_call('pointer', get_fd_path(e_b_des), round((self.read_batch_size / self.total_batch_size) * 100, 2))
         e_b_des.seek(file_pointers_start, 0)
         file_pointers_bytes = e_b_des.read(file_pointers_size)
+        on_prog_call('pointer', e_b_path, 70)
         file_pointers_str = file_pointers_bytes.decode(self.meta_encoding)
         self.file_pointers = list(
             map(int, file_pointers_str.split(self.pointer_base)[1:-1]))  # since pointer base is also at start and end
         self.read_batch_size += file_pointers_size
 
         # 4. Read decryption status data
+        on_prog_call('dec_status', e_b_path, 80)
         dec_status_size = self.total_batch_size - dec_status_start
         e_b_des.seek(dec_status_start, 0)
         dec_status_bytes = e_b_des.read(dec_status_size)
+        on_prog_call('dec_status', e_b_path, 90)
         dec_status_str = dec_status_bytes.decode(self.meta_encoding)
         self.dec_data = list(
             map(int,
                 dec_status_str.split(self.dec_status_base)[1:-1]))  # since dec_status base is also at start and end
         self.read_batch_size += dec_status_size
+        on_prog_call('dec_status', e_b_path, 100)
 
     def get_dec_data_bytes(self, dec_data=(0, 0, 0)):
         return bytes(
             self.dec_status_base + self.dec_status_base.join(str(round(_i)) for _i in dec_data) + self.dec_status_base,
             encoding=self.meta_encoding)
 
+    def commit_dec_data(self, e_f_des):
+        __prev_pos = e_f_des.tell()
+        e_f_des.seek(self.dec_status_data_pos, 0)
+        e_f_des.write(self.get_dec_data_bytes(self.dec_data))
+        e_f_des.seek(__prev_pos, 0)
+
+    def commit_dec_data_to_path(self, e_f_path, handle_read_only: bool = True):
+        if handle_read_only:
+            clear_read_only(e_f_path)
+
+        try:
+            with open(e_f_path, 'rb+') as e_f_des:
+                self.commit_dec_data(e_f_des)
+        finally:
+            if handle_read_only:
+                read_only(e_f_path)
+
     def set_dec_data(self, e_f_des, dec_data, commit: bool = True):
         self.dec_data = dec_data
 
-        if commit:
-            __prev_pos = e_f_des.tell()
-            e_f_des.seek(self.dec_status_data_pos, 0)
-            e_f_des.write(self.get_dec_data_bytes(dec_data))
-            e_f_des.seek(__prev_pos, 0)
+        if commit and e_f_des:
+            self.commit_dec_data(e_f_des)
 
-    def update_lock_status(self, e_f_des, fail_count: int, commit: bool = True):
-        fail_count = max(0, fail_count)
-        if fail_count == 0:
+    def update_lock_status(self, e_f_des, fail_tries: int, commit: bool = True):
+        fail_tries = max(0, fail_tries)
+
+        if fail_tries == 0:
             dec_code = DecNormal
-        elif fail_count < MaxFailTries:
+        elif fail_tries < MaxFailTries:
             dec_code = DecFailed
         else:
             dec_code = DecLocked
 
         regain_secs = round(
-            AccessRegainSecsBase * math.exp(AccessRegainSecsExponent * (fail_count - 1))) if fail_count else 0
+            AccessRegainSecsBase * math.exp(AccessRegainSecsExponent * (fail_tries - 1))) if fail_tries else 0
         regain_timestamp = round(time.time() + regain_secs)
 
-        self.set_dec_data(e_f_des, (dec_code, fail_count, regain_timestamp), commit)
-        return dec_code, regain_secs
+        self.set_dec_data(e_f_des, (dec_code, fail_tries, regain_timestamp), commit)
+        return dec_code, fail_tries, regain_secs
 
-    def decrypt_batch(self, e_b_des, out_dir=None, set_header=False, on_prog_call=lambda *args: print(args)):
+    def increment_lock_status(self, e_f_des, failed_tries_delta: int, commit: bool = True):
+        return self.update_lock_status(e_f_des, self.dec_data[1] + failed_tries_delta, commit)
+
+
+    def decrypt_batch(self, e_b_des, out_dir=None, set_header=False, on_prog_call=lambda *args: print(args), cancellation_provider=None):
+        """
+        :param e_b_des: encrypted batch file descriptor
+        :param out_dir: output directory for decrypted files
+        :param set_header: whether to set meta-data before decrypting (if not already set)
+        :param on_prog_call: Progress callback. receives 3 arguments (what, file_name, prog_percentage)
+        :param cancellation_provider: A cancellation signal
+        :return: True if decryption completed, False if cancelled
+        """
+
         if set_header:
             self.set_header(e_b_des=e_b_des, on_prog_call=on_prog_call)
+            if cancellation_provider and cancellation_provider():
+                return False
 
-        enc_file_path = os.path.realpath(e_b_des.name)
-        enc_file_dir, enc_file_name = os.path.split(enc_file_path)
-        enc_file_name_no_ext = os.path.splitext(enc_file_name)[0]
-        if not out_dir:
-            out_dir = os.path.join(enc_file_dir, enc_file_name_no_ext[:10] + ' (Decrypted)')
-        else:
-            out_dir = os.path.join(out_dir, enc_file_name_no_ext[:10] + ' (Decrypted)')
-
-        self.out_dir = get_non_existing_path(out_dir)
+        self.out_dir = generate_dec_output_dir_path(get_fd_path(e_b_des), out_dir_pref=out_dir, non_existing=True)
         if not os.path.isdir(self.out_dir):
             os.makedirs(self.out_dir)
 
@@ -848,7 +927,15 @@ class DecBatch(Decryptor):
             with open(out_file_path, 'wb+') as org_f_des:
                 if iters:
                     for _ in range(iters):
+                        if cancellation_provider and cancellation_provider():
+                            return False
+
                         _handle_enc_chunk(org_f_name, org_f_des, self.enc_chunk_size)
 
                 if left_bytes:
+                    if cancellation_provider and cancellation_provider():
+                        return False
+
                     _handle_enc_chunk(org_f_name, org_f_des, left_bytes)
+
+        return True
